@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Build
+dist/
+
+# Unpacked / Test outputs
+output_bg3/
+test_pack/
+extracted/
+*.lsv.manifest.json
+
+# Savegame files (können groß sein)
+*.lsv
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Env
+.env
+.env.local

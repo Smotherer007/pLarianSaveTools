@@ -1,0 +1,142 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<save>
+	<version major="3" minor="6" revision="9" build="0" lslib_meta="v1,bswap_guids" />
+	<region id="MetaData">
+		<node id="MetaData">
+			<children>
+				<node id="MetaData">
+					<attribute id="LevelUniqueKey" type="22" value="FJ_FortJoy_Main" />
+					<attribute id="Level" type="22" value="FJ_FortJoy_Main" />
+					<attribute id="Seed" type="4" value="1915742" />
+					<attribute id="Size" type="4" value="2000" />
+					<attribute id="RandomIndex" type="4" value="1604" />
+					<attribute id="TimeStamp" type="5" value="12176" />
+					<attribute id="SaveGameID" type="4" value="14" />
+					<attribute id="Sanity" type="19" value="True" />
+					<attribute id="GameSessionID" type="22" value="25b74273-412f-4d72-883c-31af930ed50d" />
+					<attribute id="Modded" type="19" value="True" />
+					<attribute id="GameMode" type="1" value="0" />
+					<attribute id="WasGMPaused" type="19" value="False" />
+					<attribute id="PeaceMode" type="19" value="False" />
+					<attribute id="GMCampaignId" type="22" value="" />
+					<attribute id="GMCampaignName" type="30" value="" />
+					<attribute id="SaveGameType" type="1" value="1" />
+					<attribute id="Difficulty" type="1" value="2" />
+					<children>
+						<node id="ModuleSettings">
+							<children>
+								<node id="Mods">
+									<children>
+										<node id="ModuleShortDesc">
+											<attribute id="UUID" type="22" value="1301db3d-1f54-4e98-9be5-5094030916e4" />
+											<attribute id="Name" type="22" value="Divinity: Original Sin 2" />
+											<attribute id="Version" type="4" value="373234071" />
+											<attribute id="MD5" type="23" value="73d13f95607b70c953cc32e56d62b7d7" />
+											<attribute id="Folder" type="30" value="DivinityOrigins_1301db3d-1f54-4e98-9be5-5094030916e4" />
+										</node>
+										<node id="ModuleShortDesc">
+											<attribute id="UUID" type="22" value="2bd9bdbe-22ae-4aa2-9c93-205880fc6564" />
+											<attribute id="Name" type="22" value="Shared" />
+											<attribute id="Version" type="4" value="389028377" />
+											<attribute id="MD5" type="23" value="bbe5db70bb4fb88387fb2319428a6995" />
+											<attribute id="Folder" type="30" value="Shared" />
+										</node>
+										<node id="ModuleShortDesc">
+											<attribute id="UUID" type="22" value="eedf7638-36ff-4f26-a50a-076b87d53ba0" />
+											<attribute id="Name" type="22" value="Shared_DOS" />
+											<attribute id="Version" type="4" value="268435456" />
+											<attribute id="MD5" type="23" value="51f45a5233f4b8a45b8a8ab71eccbc30" />
+											<attribute id="Folder" type="30" value="Shared_DOS" />
+										</node>
+										<node id="ModuleShortDesc">
+											<attribute id="UUID" type="22" value="01888044-40fa-4250-8934-add840ac23b7" />
+											<attribute id="Name" type="22" value="Party Size Evolved" />
+											<attribute id="Version" type="4" value="318898176" />
+											<attribute id="MD5" type="23" value="f3e95d51c1ffb403cb40e154355442c8" />
+											<attribute id="Folder" type="30" value="PartySizeEvolved_01888044-40fa-4250-8934-add840ac23b7" />
+										</node>
+										<node id="ModuleShortDesc">
+											<attribute id="UUID" type="22" value="3da57b9d-8b41-46c7-a33c-afb31eea38a3" />
+											<attribute id="Name" type="22" value="ArmorSets" />
+											<attribute id="Version" type="4" value="268435456" />
+											<attribute id="MD5" type="23" value="aa6c24718451153579f7b011e70763b8" />
+											<attribute id="Folder" type="30" value="ArmorSets" />
+										</node>
+									</children>
+								</node>
+							</children>
+						</node>
+						<node id="GameVersions">
+							<children>
+								<node id="GameVersion">
+									<attribute id="Object" type="23" value="3.6.117.3735" />
+								</node>
+							</children>
+						</node>
+						<node id="PartyMetaData">
+							<children>
+								<node id="CharacterMetaData">
+									<attribute id="CharacterIconID" type="22" value="PlayerPortrait_Human_Male_A" />
+									<attribute id="CharacterName" type="28" handle="ResStr_658f1ca6" value="Cordovan" />
+								</node>
+								<node id="CharacterMetaData">
+									<attribute id="CharacterIconID" type="22" value="PlayerPortrait_Lizard_Female_A" />
+									<attribute id="CharacterName" type="28" handle="ResStr_43a0a1ac" value="Darastrix" />
+								</node>
+								<node id="CharacterMetaData">
+									<attribute id="CharacterIconID" type="22" value="PlayerPortrait_Elf_Female_A" />
+									<attribute id="CharacterName" type="28" handle="ResStr_a625c5d3" value="Thalindra" />
+								</node>
+								<node id="CharacterMetaData">
+									<attribute id="CharacterIconID" type="22" value="PlayerPortrait_Dwarf_Male_A" />
+									<attribute id="CharacterName" type="28" handle="ResStr_e2f6a52f" value="Grimdor" />
+								</node>
+								<node id="CharacterMetaData">
+									<attribute id="CharacterIconID" type="22" value="bae7d0ca-dcb1-4307-929e-125effa78741_9808988147604783136-Class_Fighter_Start_(Icon_Lizard_Male)" />
+									<attribute id="CharacterName" type="28" handle="hc137ee37g4aefg4cc4g8e31g5a4cb981bf27" value="The Red Prince" />
+								</node>
+							</children>
+						</node>
+						<node id="ClientDatas">
+							<children>
+								<node id="ClientData">
+									<attribute id="Slot" type="2" value="4" />
+									<attribute id="GameCameraRotation" type="6" value="186.20241" />
+									<attribute id="GameCameraDistance" type="6" value="19" />
+									<attribute id="HotbarLocked" type="19" value="True" />
+								</node>
+								<node id="ClientData">
+									<attribute id="Slot" type="2" value="2" />
+									<attribute id="GameCameraRotation" type="6" value="83.737625" />
+									<attribute id="GameCameraDistance" type="6" value="19" />
+									<attribute id="HotbarLocked" type="19" value="True" />
+								</node>
+								<node id="ClientData">
+									<attribute id="Slot" type="2" value="3" />
+									<attribute id="GameCameraRotation" type="6" value="79.90519" />
+									<attribute id="GameCameraDistance" type="6" value="19" />
+									<attribute id="HotbarLocked" type="19" value="True" />
+								</node>
+								<node id="ClientData">
+									<attribute id="Slot" type="2" value="1" />
+									<attribute id="GameCameraRotation" type="6" value="104.71149" />
+									<attribute id="GameCameraDistance" type="6" value="19" />
+									<attribute id="HotbarLocked" type="19" value="False" />
+								</node>
+							</children>
+						</node>
+						<node id="SaveTime">
+							<attribute id="Year" type="1" value="126" />
+							<attribute id="Month" type="1" value="2" />
+							<attribute id="Day" type="1" value="11" />
+							<attribute id="Hours" type="1" value="21" />
+							<attribute id="Minutes" type="1" value="29" />
+							<attribute id="Seconds" type="1" value="6" />
+							<attribute id="Milliseconds" type="3" value="541" />
+						</node>
+					</children>
+				</node>
+			</children>
+		</node>
+	</region>
+</save>

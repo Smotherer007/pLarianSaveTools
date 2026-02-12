@@ -1,0 +1,51 @@
+{
+	"name": "dos2-savegame-tools",
+	"version": "1.0.0",
+	"description": "LSV unpacking and LSF/LSB to LSX conversion for Divinity Original Sin 2 savegames",
+	"type": "module",
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		}
+	},
+	"scripts": {
+		"build": "tsc",
+		"unpack": "node dist/cli.js unpack",
+		"convert": "node dist/cli.js convert",
+		"start": "node dist/cli.js",
+		"pretty": "npx prettier --write '**/*.{js,ts,json,xml,html,css,scss,md,yaml,yml}'"
+	},
+	"keywords": [
+		"dos2",
+    "bg3",
+		"divinity",
+		"savegame",
+		"lsv",
+		"lsf",
+		"lsb",
+		"lsx",
+		"lslib",
+    "larian",
+    "larian-studios",
+		"divinity-original-sin-2",
+		"baldurs-gate-3"
+	],
+	"author": "",
+	"license": "MIT",
+	"dependencies": {
+		"fast-xml-parser": "^5.3.5",
+		"fzstd": "^0.1.1",
+		"lz4": "^0.6.5",
+		"zstd-napi": "^0.0.12"
+	},
+	"devDependencies": {
+		"@types/node": "^20.10.0",
+		"typescript": "^5.3.0",
+		"@prettier/plugin-xml": "^3.4.2",
+		"prettier": "^3.8.1",
+		"prettier-plugin-sh": "^0.18.0"
+	}
+}

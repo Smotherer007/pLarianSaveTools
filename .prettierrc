@@ -1,0 +1,20 @@
+{
+	"trailingComma": "none",
+	"tabWidth": 4,
+	"semi": true,
+	"singleQuote": false,
+	"useTabs": true,
+	"quoteProps": "as-needed",
+	"proseWrap": "preserve",
+	"printWidth": 180,
+	"bracketSameLine": true,
+	"singleAttributePerLine": true,
+	"htmlWhitespaceSensitivity": "css",
+	"xmlSelfClosingSpace": true,
+	"xmlSortAttributesByKey": true,
+	"xmlWhitespaceSensitivity": "preserve",
+	"endOfLine": "lf",
+	"bracketSpacing": true,
+	"arrowParens": "always",
+	"plugins": ["@prettier/plugin-xml"]
+}
