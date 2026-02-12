@@ -39,13 +39,13 @@ LSF files are binary and hard to read. After converting to LSX you can edit them
 
 ### Command reference
 
-| Action | Command |
-|--------|---------|
-| Unpack | `node dist/cli.js unpack file.lsv target-folder` |
+| Action                            | Command                                                     |
+| --------------------------------- | ----------------------------------------------------------- |
+| Unpack                            | `node dist/cli.js unpack file.lsv target-folder`            |
 | Unpack (with manifest for repack) | `node dist/cli.js unpack file.lsv target-folder --manifest` |
-| Repack | `node dist/cli.js pack source-folder output.lsv` |
-| LSF → LSX | `node dist/cli.js convert file.lsf file.lsx` |
-| LSX → LSF | `node dist/cli.js convert file.lsx file.lsf` |
+| Repack                            | `node dist/cli.js pack source-folder output.lsv`            |
+| LSF → LSX                         | `node dist/cli.js convert file.lsf file.lsx`                |
+| LSX → LSF                         | `node dist/cli.js convert file.lsx file.lsf`                |
 
 ### Help
 

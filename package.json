@@ -20,7 +20,7 @@
 	},
 	"keywords": [
 		"dos2",
-    "bg3",
+		"bg3",
 		"divinity",
 		"savegame",
 		"lsv",
@@ -28,13 +28,13 @@
 		"lsb",
 		"lsx",
 		"lslib",
-    "larian",
-    "larian-studios",
+		"larian",
+		"larian-studios",
 		"divinity-original-sin-2",
 		"baldurs-gate-3"
 	],
-	"author": "",
-	"license": "MIT",
+	"author": "Patrick Weppelmann",
+	"license": "Apache-2.0",
 	"dependencies": {
 		"fast-xml-parser": "^5.3.5",
 		"fzstd": "^0.1.1",
