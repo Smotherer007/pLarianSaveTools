@@ -58,4 +58,4 @@ Use `help` or `--help` to see an overview of all commands.
 
 ## License
 
-MIT
+Apache License 2.0 – siehe [LICENSE](LICENSE) für Details.
