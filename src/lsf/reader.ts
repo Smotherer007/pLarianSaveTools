@@ -254,16 +254,33 @@ export class LSFReader {
 					return decompressLZ4Frame(raw);
 				}
 			}
-			const out = Buffer.alloc(uncompressedSize);
-			const decoded = lz4.decodeBlock(raw, out);
+			// Größerer Puffer wie bei LSV – manche Blöcke brauchen mehr Platz
+			const out = Buffer.alloc(Math.max(uncompressedSize, raw.length * 10));
+			let decoded = lz4.decodeBlock(raw, out);
 			if (decoded < 0) {
+				// Fallback: LZ4-Frame ohne Magic am Anfang oder Zstd (BG3/DOS2-Varianten)
+				try {
+					const dec = lz4.decode(raw);
+					const buf = Buffer.isBuffer(dec) ? dec : Buffer.from(dec);
+					if (buf.length <= uncompressedSize * 2) return buf.subarray(0, buf.length);
+				} catch {
+					// ignore
+				}
+				try {
+					const dec = decompressZstd(raw);
+					const buf = Buffer.isBuffer(dec) ? dec : Buffer.from(dec);
+					if (buf.length <= uncompressedSize * 2) return buf.subarray(0, Math.min(buf.length, uncompressedSize));
+				} catch {
+					// ignore
+				}
 				// BG3 LevelCache: Values-Block kann anderes Format haben – Rohdaten mit Null-Padding als Fallback
 				if (isValues && sizeOnDisk <= uncompressedSize) {
 					const result = Buffer.alloc(uncompressedSize, 0);
 					raw.copy(result, 0, 0, Math.min(sizeOnDisk, uncompressedSize));
 					return result;
 				}
-				throw new Error(`LZ4 block decompression failed at offset ${startOff}, code ${decoded}`);
+				// Debug: welche Blockgrößen
+				throw new Error(`LZ4 block decompression failed at offset ${startOff}, code ${decoded} (uc=${uncompressedSize}, c=${sizeOnDisk})`);
 			}
 			return out.subarray(0, decoded);
 		}
