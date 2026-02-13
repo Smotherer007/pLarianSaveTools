@@ -38,23 +38,16 @@
 	"author": "",
 	"license": "MIT",
 	"dependencies": {
-		"express": "^5.2.1",
 		"fast-xml-parser": "^5.3.5",
 		"fzstd": "^0.1.1",
 		"lz4": "^0.6.5",
-		"multer": "^2.0.2",
-		"uuid": "^13.0.0",
 		"zstd-napi": "^0.0.12"
 	},
 	"devDependencies": {
 		"@prettier/plugin-xml": "^3.4.2",
-		"@types/express": "^5.0.6",
-		"@types/multer": "^2.0.0",
-		"@types/node": "^20.10.0",
-		"@types/uuid": "^10.0.0",
 		"patch-package": "^8.0.1",
 		"prettier": "^3.8.1",
 		"prettier-plugin-sh": "^0.18.0",
-		"typescript": "^5.3.0"
+		"typescript": "^5.9.3"
 	}
 }

@@ -54,7 +54,7 @@ export function compressLZ4(data: Buffer): Buffer {
 }
 
 export function compressZlib(data: Buffer): Buffer {
-	return deflateSync(data);
+	return deflateSync(data, { level: 9 });
 }
 
 export function compress(data: Buffer, flags: number): Buffer {

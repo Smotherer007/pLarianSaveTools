@@ -1,5 +1,7 @@
-import { writeFileSync } from "node:fs";
-import { LSFNode, LSFAttribute, NodeAttributeType } from "./types.js";
+import { writeFileSync, readFileSync, unlinkSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { LSFNode, LSFAttribute, NodeAttributeType, TranslatedFSStringValue } from "./types.js";
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const lz4 = require("lz4");
@@ -65,7 +67,47 @@ function flattenNodes(node: LSFNode, parentIdx: number, result: LSFNode[]): numb
 	return idx;
 }
 
-function serializeAttributeValue(attr: LSFAttribute): Buffer {
+function serializeTranslatedFSString(attr: LSFAttribute, isBG3: boolean): Buffer {
+	const ts = (attr.value as TranslatedFSStringValue) ?? {};
+	const v = String(ts.value ?? "");
+	const h = String(ts.handle ?? "");
+	const args = ts.arguments ?? [];
+	const chunks: Buffer[] = [];
+	if (isBG3) {
+		chunks.push(Buffer.from([0, 0])); // Version
+	} else {
+		const vEnc = Buffer.from(v + "\0", "utf8");
+		const vBuf = Buffer.alloc(4 + vEnc.length);
+		vBuf.writeInt32LE(vEnc.length, 0);
+		vEnc.copy(vBuf, 4);
+		chunks.push(vBuf);
+	}
+	const hEnc = Buffer.from(h + "\0", "utf8");
+	const hBuf = Buffer.alloc(4 + hEnc.length);
+	hBuf.writeInt32LE(hEnc.length, 0);
+	hEnc.copy(hBuf, 4);
+	chunks.push(hBuf);
+	const argsBuf = Buffer.alloc(4);
+	argsBuf.writeInt32LE(args.length, 0);
+	chunks.push(argsBuf);
+	for (const arg of args) {
+		const kEnc = Buffer.from(arg.key + "\0", "utf8");
+		const kBuf = Buffer.alloc(4 + kEnc.length);
+		kBuf.writeInt32LE(kEnc.length, 0);
+		kEnc.copy(kBuf, 4);
+		chunks.push(kBuf);
+		const sub = arg.string ?? { value: "", handle: "" };
+		chunks.push(serializeTranslatedFSString({ ...attr, value: sub }, isBG3));
+		const valEnc = Buffer.from(arg.value + "\0", "utf8");
+		const valBuf = Buffer.alloc(4 + valEnc.length);
+		valBuf.writeInt32LE(valEnc.length, 0);
+		valEnc.copy(valBuf, 4);
+		chunks.push(valBuf);
+	}
+	return Buffer.concat(chunks);
+}
+
+function serializeAttributeValue(attr: LSFAttribute, isBG3: boolean = false): Buffer {
 	const { type, value } = attr;
 	switch (type) {
 		case NodeAttributeType.Byte:
@@ -122,8 +164,7 @@ function serializeAttributeValue(attr: LSFAttribute): Buffer {
 			for (let i = 8; i < 16; i += 2) [b[i], b[i + 1]] = [b[i + 1], b[i]];
 			return b;
 		}
-		case NodeAttributeType.TranslatedString:
-		case NodeAttributeType.TranslatedFSString: {
+		case NodeAttributeType.TranslatedString: {
 			const ts = (value as { value?: string; handle?: string }) ?? {};
 			const v = String(ts.value ?? "");
 			const h = String(ts.handle ?? "");
@@ -139,6 +180,9 @@ function serializeAttributeValue(attr: LSFAttribute): Buffer {
 			o += 4;
 			hEnc.copy(out, o);
 			return out;
+		}
+		case NodeAttributeType.TranslatedFSString: {
+			return serializeTranslatedFSString(attr, isBG3);
 		}
 		case NodeAttributeType.IVec2:
 		case NodeAttributeType.IVec3:
@@ -176,21 +220,34 @@ function serializeAttributeValue(attr: LSFAttribute): Buffer {
 	}
 }
 
-function getAttributeLength(attr: LSFAttribute): number {
-	return serializeAttributeValue(attr).length;
+function getAttributeLength(attr: LSFAttribute, isBG3: boolean = false): number {
+	return serializeAttributeValue(attr, isBG3).length;
 }
 
 function compressBlock(data: Buffer): Buffer {
 	if (data.length === 0) return data;
 	const maxOut = lz4.encodeBound(data.length);
 	const out = Buffer.alloc(maxOut);
-	const written = lz4.encodeBlock(data, out);
-	if (written >= 0) return out.subarray(0, written);
-	return data;
+	// encodeBlockHC = bessere Kompression (LZ4_HC), gleiches Block-Format (decodeBlock-kompatibel)
+	let written = -1;
+	if (typeof lz4.encodeBlockHC === "function") {
+		written = lz4.encodeBlockHC(data, out);
+	}
+	if (written <= 0) {
+		written = lz4.encodeBlock(data, out);
+	}
+	return written > 0 ? out.subarray(0, written) : data;
 }
 
-export function writeLsf(root: LSFNode, outputPath: string, version?: LsfVersion): void {
+export interface WriteLsfOptions {
+	/** 0 = V2 (12 B/node, 12 B/attr, kompakter), 1 = V3 (16 B). DOS2 nutzt 0. */
+	metadataFormat?: number;
+}
+
+export function writeLsf(root: LSFNode, outputPath: string, version?: LsfVersion, options?: WriteLsfOptions): void {
 	const v = version ?? { major: 3, minor: 6, revision: 9, build: 0 };
+	const isBG3 = v.major >= 4;
+	const metadataFormat = options?.metadataFormat ?? (isBG3 ? 1 : 0);
 	const engineVersion = packEngineVersion(v);
 
 	const names = collectStrings(root);
@@ -223,8 +280,8 @@ export function writeLsf(root: LSFNode, outputPath: string, version?: LsfVersion
 
 		for (const name of attrNames) {
 			const attr = node.attributes[name];
-			const len = getAttributeLength(attr);
-			valueChunks.push(serializeAttributeValue(attr));
+			const len = getAttributeLength(attr, isBG3);
+			valueChunks.push(serializeAttributeValue(attr, isBG3));
 			flatAttrs.push({
 				nameIndex: indexMap.get(name) ?? 0,
 				type: attr.type,
@@ -261,33 +318,53 @@ export function writeLsf(root: LSFNode, outputPath: string, version?: LsfVersion
 		});
 	}
 
-	const nodeBuf = Buffer.alloc(flatNodes.length * 16);
-	for (let i = 0; i < nodeEntries.length; i++) {
-		const n = nodeEntries[i];
-		const no = i * 16;
-		nodeBuf.writeUInt32LE(n.nameIndex, no);
-		nodeBuf.writeInt32LE(n.parentIndex, no + 4);
-		nodeBuf.writeInt32LE(n.nextSiblingIndex, no + 8);
-		nodeBuf.writeInt32LE(n.firstAttributeIndex, no + 12);
-	}
+	const nodeEntrySize = metadataFormat === 1 ? 16 : 12;
+	const attrEntrySize = metadataFormat === 1 ? 16 : 12;
+	const nodeBuf = Buffer.alloc(flatNodes.length * nodeEntrySize);
+	const attrBuf = Buffer.alloc(flatAttrs.length * attrEntrySize);
 
-	// nextAttributeIndex pro Node: letzter Attr = -1, sonst Index des nächsten
-	const nextAttrMap = new Map<number, number>();
-	for (let i = 0; i < flatAttrs.length; i++) {
-		const nodeAttrs = attrIdxByNode[flatAttrs[i].nodeIdx];
-		const pos = nodeAttrs.indexOf(i);
-		nextAttrMap.set(i, pos >= 0 && pos < nodeAttrs.length - 1 ? nodeAttrs[pos + 1] : -1);
-	}
-
-	const attrBuf = Buffer.alloc(flatAttrs.length * 16);
-	for (let i = 0; i < flatAttrs.length; i++) {
-		const a = flatAttrs[i];
-		const ao = i * 16;
-		attrBuf.writeUInt32LE(a.nameIndex, ao);
-		attrBuf.writeUInt32LE((a.type & 0x3f) | (a.length << 6), ao + 4);
-		attrBuf.writeInt32LE(nextAttrMap.get(i) ?? -1, ao + 8);
-		attrBuf.writeUInt32LE(valueOffset, ao + 12);
-		valueOffset += a.length;
+	if (metadataFormat === 1) {
+		for (let i = 0; i < nodeEntries.length; i++) {
+			const n = nodeEntries[i];
+			const no = i * 16;
+			nodeBuf.writeUInt32LE(n.nameIndex, no);
+			nodeBuf.writeInt32LE(n.parentIndex, no + 4);
+			nodeBuf.writeInt32LE(n.nextSiblingIndex, no + 8);
+			nodeBuf.writeInt32LE(n.firstAttributeIndex, no + 12);
+		}
+		const nextAttrMap = new Map<number, number>();
+		for (let i = 0; i < flatAttrs.length; i++) {
+			const nodeAttrs = attrIdxByNode[flatAttrs[i].nodeIdx];
+			const pos = nodeAttrs.indexOf(i);
+			nextAttrMap.set(i, pos >= 0 && pos < nodeAttrs.length - 1 ? nodeAttrs[pos + 1] : -1);
+		}
+		valueOffset = 0;
+		for (let i = 0; i < flatAttrs.length; i++) {
+			const a = flatAttrs[i];
+			const ao = i * 16;
+			attrBuf.writeUInt32LE(a.nameIndex, ao);
+			attrBuf.writeUInt32LE((a.type & 0x3f) | (a.length << 6), ao + 4);
+			attrBuf.writeInt32LE(nextAttrMap.get(i) ?? -1, ao + 8);
+			attrBuf.writeUInt32LE(valueOffset, ao + 12);
+			valueOffset += a.length;
+		}
+	} else {
+		for (let i = 0; i < nodeEntries.length; i++) {
+			const n = nodeEntries[i];
+			const no = i * 12;
+			nodeBuf.writeUInt32LE(n.nameIndex, no);
+			nodeBuf.writeInt32LE(n.firstAttributeIndex, no + 4);
+			nodeBuf.writeInt32LE(n.parentIndex, no + 8);
+		}
+		valueOffset = 0;
+		for (let i = 0; i < flatAttrs.length; i++) {
+			const a = flatAttrs[i];
+			const ao = i * 12;
+			attrBuf.writeUInt32LE(a.nameIndex, ao);
+			attrBuf.writeUInt32LE((a.type & 0x3f) | (a.length << 6), ao + 4);
+			attrBuf.writeInt32LE(a.nodeIdx, ao + 8);
+			valueOffset += a.length;
+		}
 	}
 
 	const valuesBuf = Buffer.concat(valueChunks);
@@ -297,33 +374,30 @@ export function writeLsf(root: LSFNode, outputPath: string, version?: LsfVersion
 	const attrCompressed = compressBlock(attrBuf);
 	const valueCompressed = compressBlock(valuesBuf);
 
-	const isBG3 = v.major >= 4;
 	let output: Buffer;
 
 	if (isBG3) {
-		// BG3 v6+: 16-Byte-Header, 48-Byte-Meta, Block-Reihenfolge strings, nodes, keys, attrs, values
 		const meta = Buffer.alloc(48);
 		meta.writeUInt32LE(stringBuf.length, 0);
 		meta.writeUInt32LE(stringCompressed.length, 4);
-		meta.writeUInt32LE(0, 8); // keys uncompressed
-		meta.writeUInt32LE(0, 12); // keys compressed
+		meta.writeUInt32LE(0, 8);
+		meta.writeUInt32LE(0, 12);
 		meta.writeUInt32LE(nodeBuf.length, 16);
 		meta.writeUInt32LE(nodeCompressed.length, 20);
 		meta.writeUInt32LE(attrBuf.length, 24);
 		meta.writeUInt32LE(attrCompressed.length, 28);
 		meta.writeUInt32LE(valuesBuf.length, 32);
 		meta.writeUInt32LE(valueCompressed.length, 36);
-		meta.writeUInt8(34, 40); // LZ4 (0x22)
-		meta.writeUInt32LE(1, 44); // metadataFormat 1 (V3)
+		meta.writeUInt8(34, 40);
+		meta.writeUInt32LE(1, 44);
 
 		const header = Buffer.alloc(16);
 		header.write("LSOF", 0);
-		header.writeUInt32LE(6, 4); // LSF v6
+		header.writeUInt32LE(6, 4);
 		header.writeBigUInt64LE(packEngineVersionBG3(v), 8);
 
 		output = Buffer.concat([header, meta, stringCompressed, nodeCompressed, attrCompressed, valueCompressed]);
 	} else {
-		// DOS2 v3
 		const meta = Buffer.alloc(40);
 		meta.writeUInt32LE(stringBuf.length, 0);
 		meta.writeUInt32LE(stringCompressed.length, 4);
@@ -333,10 +407,10 @@ export function writeLsf(root: LSFNode, outputPath: string, version?: LsfVersion
 		meta.writeUInt32LE(attrCompressed.length, 20);
 		meta.writeUInt32LE(valuesBuf.length, 24);
 		meta.writeUInt32LE(valueCompressed.length, 28);
-		meta.writeUInt32LE(34, 32); // LZ4 (0x22)
+		meta.writeUInt32LE(34, 32);
 		meta.writeUInt8(0, 36);
 		meta.writeUInt16LE(0, 37);
-		meta.writeUInt8(1, 39);
+		meta.writeUInt8(metadataFormat, 39);
 
 		const header = Buffer.alloc(12);
 		header.write("LSOF", 0);
@@ -347,4 +421,15 @@ export function writeLsf(root: LSFNode, outputPath: string, version?: LsfVersion
 	}
 
 	writeFileSync(outputPath, output);
+}
+
+/** LSF als Buffer schreiben (für In-Memory-Packing). */
+export function writeLsfToBuffer(root: LSFNode, version?: LsfVersion, options?: WriteLsfOptions): Buffer {
+	const tmp = join(tmpdir(), `lsf-${Date.now()}-${Math.random().toString(36).slice(2)}.lsf`);
+	writeLsf(root, tmp, version, options);
+	try {
+		return readFileSync(tmp);
+	} finally {
+		unlinkSync(tmp);
+	}
 }

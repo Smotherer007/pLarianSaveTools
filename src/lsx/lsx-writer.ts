@@ -1,4 +1,4 @@
-import { LSFNode, LSFAttribute, NodeAttributeType } from "../lsf/types.js";
+import { LSFNode, LSFAttribute, NodeAttributeType, TranslatedFSStringValue } from "../lsf/types.js";
 
 export interface LsxVersion {
 	major: number;
@@ -16,7 +16,11 @@ export interface LsxOptions {
 
 export function convertLsfToLsx(root: LSFNode, version?: LsxVersion, options?: LsxOptions): string {
 	const v = version ?? { major: 4, minor: 0, revision: 0, build: 0 };
-	const opts = { numericTypes: true, lslibMeta: "v1,bswap_guids", ...options };
+	const opts = {
+		numericTypes: v.major < 4,
+		lslibMeta: "v1,bswap_guids",
+		...options
+	};
 
 	const BOM = "\uFEFF";
 	const EOL = "\r\n";
@@ -41,7 +45,8 @@ function serializeNode(node: LSFNode, indent: number, opts: LsxOptions, eol: str
 	const tab = "\t";
 	const spacing = tab.repeat(indent);
 	const inner = tab.repeat(indent + 1);
-	let xml = `${spacing}<node id="${escapeXml(node.name)}">${eol}`;
+	const keyAttr = node.key ? ` key="${escapeXml(node.key)}"` : "";
+	let xml = `${spacing}<node id="${escapeXml(node.name)}"${keyAttr}>${eol}`;
 
 	for (const [name, attr] of Object.entries(node.attributes)) {
 		xml += serializeAttribute(name, attr, inner, opts, eol);
@@ -59,20 +64,48 @@ function serializeNode(node: LSFNode, indent: number, opts: LsxOptions, eol: str
 	return xml;
 }
 
+function serializeTranslatedFSStringArgs(args: NonNullable<TranslatedFSStringValue["arguments"]>, inner: string, eol: string): string {
+	let xml = "";
+	for (const arg of args) {
+		if (arg.string) {
+			const s = arg.string;
+			const nestedArgs = s.arguments && s.arguments.length > 0;
+			xml += `${inner}<argument key="${escapeXml(arg.key)}" value="${escapeXml(arg.value)}">${eol}`;
+			if (nestedArgs) {
+				xml += `${inner}\t<string value="${escapeXml(s.value)}" handle="${escapeXml(s.handle)}" arguments="${s.arguments!.length}">${eol}`;
+				xml += serializeTranslatedFSStringArgs(s.arguments!, inner + "\t\t", eol);
+				xml += `${inner}\t</string>${eol}`;
+			} else {
+				xml += `${inner}\t<string value="${escapeXml(s.value)}" handle="${escapeXml(s.handle)}" arguments="0" />${eol}`;
+			}
+			xml += `${inner}</argument>${eol}`;
+		} else {
+			xml += `${inner}<argument key="${escapeXml(arg.key)}" value="${escapeXml(arg.value)}" />${eol}`;
+		}
+	}
+	return xml;
+}
+
 function serializeAttribute(name: string, attr: LSFAttribute, spacing: string, opts: LsxOptions, eol: string = "\n"): string {
 	const typeStr = opts.numericTypes ? String(attr.type) : (NodeAttributeType[attr.type] ?? "Unknown");
+	const inner = spacing + "\t";
 	let valueStr: string;
 	let extraAttrs = "";
 
 	if (attr.type === NodeAttributeType.TranslatedString || attr.type === NodeAttributeType.TranslatedFSString) {
-		const ts = attr.value as { value: string; handle: string };
+		const ts = attr.value as TranslatedFSStringValue | { value: string; handle: string };
 		if (ts && typeof ts === "object" && "handle" in ts) {
 			valueStr = ts.value || "";
 			if (ts.handle) extraAttrs = ` handle="${escapeXml(ts.handle)}"`;
+			const args = (ts as TranslatedFSStringValue).arguments;
+			if (args && args.length > 0) {
+				extraAttrs += ` arguments="${args.length}"`;
+				const argsXml = serializeTranslatedFSStringArgs(args, inner, eol);
+				return `${spacing}<attribute id="${escapeXml(name)}" type="${typeStr}"${extraAttrs} value="${escapeXml(valueStr)}">${eol}${inner}<arguments>${eol}${argsXml}${inner}</arguments>${eol}${spacing}</attribute>${eol}`;
+			}
 		} else {
 			valueStr = String(attr.value);
 		}
-		// Example: handle vor value (Attribut-Reihenfolge)
 		return `${spacing}<attribute id="${escapeXml(name)}" type="${typeStr}"${extraAttrs} value="${escapeXml(valueStr)}" />${eol}`;
 	} else if (attr.type === NodeAttributeType.Bool) {
 		valueStr = attr.value ? "True" : "False";

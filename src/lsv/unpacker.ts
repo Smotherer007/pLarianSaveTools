@@ -191,6 +191,11 @@ function extractFile(data: Buffer, file: PackagedFileInfo, dataOffset: number): 
 	throw new Error(`Multi-part packages (part ${file.archivePart}) not yet supported`);
 }
 
+/** Extrahiert den Inhalt einer einzelnen Datei aus dem Package (für Konvertierung). */
+export function extractFileContent(data: Buffer, file: PackagedFileInfo, dataOffset: number): Buffer {
+	return extractFile(data, file, dataOffset);
+}
+
 /**
  * Read LSV package and return list of contained files with their metadata
  */
@@ -202,17 +207,12 @@ export function readPackage(inputPath: string): {
 	const data = readFileSync(inputPath);
 	const { header } = readHeader(data);
 
-	// v13/BG3: DataOffset = 0
-	const dataOffset = header.headerAtStart || header.version > 10 ? 0 : header.fileListOffset + 32;
-
 	const files = readFileListV13(data, header);
 	return { files, data, header };
 }
 
 export interface UnpackOptions {
 	filter?: (name: string) => boolean;
-	/** Manifest speichern für pack (Roundtrip) */
-	manifest?: boolean;
 }
 
 /**
@@ -237,19 +237,6 @@ export function unpackLsv(inputPath: string, outputDir: string, options?: Unpack
 		const content = extractFile(data, file, dataOffset);
 		writeFileSync(outPath, content, { flag: "w" });
 		extracted.push(outPath);
-	}
-
-	if (options?.manifest) {
-		const manifest = {
-			version: header.version ?? 13,
-			files: files.map((f) => ({
-				name: f.name,
-				flags: f.flags,
-				uncompressedSize: f.uncompressedSize,
-				archivePart: f.archivePart
-			}))
-		};
-		writeFileSync(join(outputDir, ".lsv.manifest.json"), JSON.stringify(manifest, null, 2), "utf8");
 	}
 
 	return extracted;

@@ -79,8 +79,25 @@ export interface LSFAttributeEntry {
 
 export interface LSFNode {
 	name: string;
+	/** UUID für eindeutige Node-Referenz (BG3, LSX key-Attribut) */
+	key?: string;
 	attributes: Record<string, LSFAttribute>;
 	children: LSFNode[];
+}
+
+/** TranslatedFSString mit optionalen Arguments (für Platzhalter wie [Name]) */
+export interface TranslatedFSStringValue {
+	value: string;
+	handle: string;
+	arguments?: TranslatedFSStringArgument[];
+}
+
+/** Argument: key + value (Literal) oder key + value + string (TranslatedFSString) */
+export interface TranslatedFSStringArgument {
+	key: string; // UUID oder Platzhalter-ID
+	value: string; // Literal (argument value-Attribut)
+	/** Optional: verschachtelter TranslatedFSString wenn <string> Kind vorhanden */
+	string?: TranslatedFSStringValue;
 }
 
 export interface LSFAttribute {

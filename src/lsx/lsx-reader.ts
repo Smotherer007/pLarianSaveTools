@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { XMLParser } from "fast-xml-parser";
-import { LSFNode, LSFAttribute, NodeAttributeType } from "../lsf/types.js";
+import { LSFNode, LSFAttribute, NodeAttributeType, TranslatedFSStringValue } from "../lsf/types.js";
 
 export interface LsxVersion {
 	major: number;
@@ -61,10 +61,38 @@ function parseType(typeStr: string | number): NodeAttributeType {
 	return nameMap[String(typeStr)] ?? NodeAttributeType.String;
 }
 
-function parseAttributeValue(type: NodeAttributeType, valueStr: string, handle?: string): any {
+function parseTranslatedFSStringArguments(argsEl: any): TranslatedFSStringValue["arguments"] {
+	if (!argsEl) return undefined;
+	const argList = argsEl?.argument ?? [];
+	const arr = Array.isArray(argList) ? argList : [argList];
+	const result: NonNullable<TranslatedFSStringValue["arguments"]> = [];
+	for (const a of arr) {
+		if (!a || typeof a !== "object") continue;
+		const attrs = getAttrs(a);
+		const key = attrs.key ?? "";
+		const valueAttr = attrs.value ?? "";
+		const stringEl = a?.string;
+		const arg: { key: string; value: string; string?: TranslatedFSStringValue } = { key, value: valueAttr };
+		if (stringEl) {
+			const s = Array.isArray(stringEl) ? stringEl[0] : stringEl;
+			const sAttrs = getAttrs(s);
+			const nestedArgs = s?.arguments ? parseTranslatedFSStringArguments(s.arguments) : undefined;
+			arg.string = {
+				value: sAttrs.value ?? "",
+				handle: sAttrs.handle ?? "",
+				...(nestedArgs && nestedArgs.length > 0 ? { arguments: nestedArgs } : {})
+			};
+		}
+		result.push(arg);
+	}
+	return result.length > 0 ? result : undefined;
+}
+
+function parseAttributeValue(type: NodeAttributeType, valueStr: string, handle?: string, el?: any): any {
 	if (valueStr === undefined) valueStr = "";
 	if (type === NodeAttributeType.TranslatedString || type === NodeAttributeType.TranslatedFSString) {
-		return { value: valueStr, handle: handle ?? "" };
+		const args = type === NodeAttributeType.TranslatedFSString && el ? parseTranslatedFSStringArguments(el.arguments) : undefined;
+		return { value: valueStr, handle: handle ?? "", ...(args && args.length > 0 ? { arguments: args } : {}) };
 	}
 	if (type === NodeAttributeType.Bool) {
 		return valueStr === "True" || valueStr === "true" || valueStr === "1";
@@ -93,7 +121,7 @@ function parseAttribute(el: any): LSFAttribute | null {
 	return {
 		name: a.id,
 		type,
-		value: parseAttributeValue(type, valueStr, handle)
+		value: parseAttributeValue(type, valueStr, handle, el)
 	};
 }
 
@@ -101,6 +129,7 @@ function parseNode(el: any): LSFNode | null {
 	const a = getAttrs(el);
 	const name = a.id ?? "Node";
 	const node: LSFNode = { name, attributes: {}, children: [] };
+	if (a.key) node.key = a.key;
 
 	const attrs = el?.attribute ?? [];
 	const attrList = Array.isArray(attrs) ? attrs : [attrs];

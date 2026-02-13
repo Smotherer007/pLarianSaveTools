@@ -23,13 +23,13 @@
 
 export { unpackLsv, readPackage } from "./lsv/unpacker.js";
 export type { UnpackOptions } from "./lsv/unpacker.js";
-export { packLsv } from "./lsv/packer.js";
-export type { PackManifest } from "./lsv/packer.js";
+export { packLsv, packLsvFromLsx } from "./lsv/packer.js";
+export type { PackLsvOptions } from "./lsv/packer.js";
 export type { PackagedFileInfo } from "./lsv/types.js";
 export { decompress, decompressLZ4, decompressZlib } from "./lsv/compression.js";
 export { LSFReader } from "./lsf/reader.js";
-export { writeLsf } from "./lsf/writer.js";
-export type { LsfVersion } from "./lsf/writer.js";
+export { writeLsf, writeLsfToBuffer } from "./lsf/writer.js";
+export type { LsfVersion, WriteLsfOptions } from "./lsf/writer.js";
 export { convertLsfToLsx } from "./lsx/lsx-writer.js";
 export { parseLsx } from "./lsx/lsx-reader.js";
 export type { LsxVersion, LsxOptions } from "./lsx/lsx-writer.js";

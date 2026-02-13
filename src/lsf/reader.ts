@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { LSFAttribute, LSFAttributeEntry, LSFHeader, LSFMetadataBlock, LSFNode, LSFNodeEntry, NodeAttributeType } from "./types.js";
+import { LSFAttribute, LSFAttributeEntry, LSFHeader, LSFMetadataBlock, LSFNode, LSFNodeEntry, NodeAttributeType, TranslatedFSStringValue } from "./types.js";
 import { decompress as decompressZstd } from "fzstd";
 
 import { createRequire } from "node:module";
@@ -33,12 +33,12 @@ function decompressLZ4Frame(raw: Buffer): Buffer {
 	const maxBlockBuffer = Math.max(blockMaxSize, 4 << 20);
 	let dictBuf: Buffer = Buffer.alloc(0);
 	const DICT_SIZE = 64 << 10;
-	const bindings = (lz4 as { utils?: { bindings?: { uncompressWithDict?: (a: Buffer, b: Buffer, c: number, d: number, e: Buffer) => number } } }).utils?.bindings;
+	const bindings = (lz4 as { utils?: { bindings?: { uncompressWithDict?: (input: Buffer, output: Buffer, dict?: Buffer) => number } } }).utils?.bindings;
 	const uncompressWithDict = bindings?.uncompressWithDict;
 
 	const decompressBlock = (blockData: Buffer, out: Buffer): number => {
 		if (!blockIndependence && dictBuf.length > 0 && uncompressWithDict) {
-			return uncompressWithDict(blockData, out, blockData.length, out.length, dictBuf);
+			return uncompressWithDict(blockData, out, dictBuf);
 		}
 		return lz4.decodeBlock(blockData, out);
 	};
@@ -489,8 +489,67 @@ export class LSFReader {
 		return { value, handle };
 	}
 
-	private readTranslatedFSString(buf: Buffer): { value: string; handle: string } {
-		return this.readTranslatedString(buf);
+	/** LSF-Format: value/handle wie TranslatedString, dann arguments mit key, String (rekursiv), value. Gibt auch bytesConsumed zurück. */
+	private readTranslatedFSStringWithLength(buf: Buffer): { result: TranslatedFSStringValue; bytesConsumed: number } {
+		let pos = 0;
+		const isBG3 = this.header.version >= 5;
+		let value = "";
+
+		if (buf.length < 4) return { result: { value: "", handle: "" }, bytesConsumed: 0 };
+		if (isBG3) {
+			if (buf.length < 6) return { result: { value: "", handle: "" }, bytesConsumed: 0 };
+			pos += 2; // Version
+		} else {
+			const valueLen = buf.readInt32LE(pos);
+			pos += 4;
+			if (valueLen > 0 && buf.length >= pos + valueLen) {
+				value = this.readLsfString(buf.subarray(pos, pos + valueLen));
+				pos += valueLen;
+			}
+		}
+
+		if (buf.length < pos + 4) return { result: { value, handle: "" }, bytesConsumed: pos };
+		const handleLen = buf.readInt32LE(pos);
+		pos += 4;
+		let handle = "";
+		if (handleLen > 0 && buf.length >= pos + handleLen) {
+			handle = this.readLsfString(buf.subarray(pos, pos + handleLen));
+			pos += handleLen;
+		}
+
+		if (buf.length < pos + 4) return { result: { value, handle }, bytesConsumed: pos };
+		const numArgs = buf.readInt32LE(pos);
+		pos += 4;
+		if (numArgs <= 0) return { result: { value, handle }, bytesConsumed: pos };
+
+		const args: NonNullable<TranslatedFSStringValue["arguments"]> = [];
+		for (let i = 0; i < numArgs; i++) {
+			if (buf.length < pos + 4) break;
+			const keyLen = buf.readInt32LE(pos);
+			pos += 4;
+			let key = "";
+			if (keyLen > 0 && buf.length >= pos + keyLen) {
+				key = this.readLsfString(buf.subarray(pos, pos + keyLen));
+				pos += keyLen;
+			}
+			const subBuf = buf.subarray(pos);
+			const { result: sub, bytesConsumed: subLen } = this.readTranslatedFSStringWithLength(subBuf);
+			pos += subLen;
+			if (buf.length < pos + 4) break;
+			const valLen = buf.readInt32LE(pos);
+			pos += 4;
+			let val = "";
+			if (valLen > 0 && buf.length >= pos + valLen) {
+				val = this.readLsfString(buf.subarray(pos, pos + valLen));
+				pos += valLen;
+			}
+			args.push({ key, value: val, string: sub });
+		}
+		return { result: { value, handle, arguments: args }, bytesConsumed: pos };
+	}
+
+	private readTranslatedFSString(buf: Buffer): TranslatedFSStringValue {
+		return this.readTranslatedFSStringWithLength(buf).result;
 	}
 
 	private readAttributeValue(attr: LSFAttributeEntry, offset: number): any {
