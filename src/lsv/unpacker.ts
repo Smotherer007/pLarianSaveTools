@@ -37,6 +37,8 @@ interface PackageHeader {
 	fileListSize: number;
 	numParts: number;
 	numFiles: number;
+	flags?: number;
+	priority?: number;
 	/** true für BG3 (v15/v16/v18) mit Header am Anfang */
 	headerAtStart?: boolean;
 }
@@ -84,7 +86,9 @@ function readHeader(data: Buffer): { header: PackageHeader; headerOffset: number
 		fileListOffset: readU32(headerBuf, 4),
 		fileListSize: readU32(headerBuf, 8),
 		numParts: headerBuf.readUInt16LE(10),
-		numFiles: 0
+		numFiles: 0,
+		flags: headerBuf[12],
+		priority: headerBuf[13]
 	};
 
 	if (header.version >= 7 && header.version <= 10 && headerOffset === 0) {
@@ -213,17 +217,24 @@ export function readPackage(inputPath: string): {
 
 export interface UnpackOptions {
 	filter?: (name: string) => boolean;
+	/** Manifest für Roundtrip schreiben (default: true) */
+	manifest?: boolean;
 }
+
+const MANIFEST_NAME = "__manifest__.json";
 
 /**
  * Unpack LSV savegame file to directory
  * Extracts all LSF/LSB files which can then be converted to LSX
+ * Schreibt __manifest__.json mit Dateireihenfolge für byte-identischen Pack-Roundtrip (LSLib-kompatibel)
  */
 export function unpackLsv(inputPath: string, outputDir: string, options?: UnpackOptions): string[] {
 	const { files, data, header } = readPackage(inputPath);
 	const dataOffset = 0; // v13 format
+	const writeManifest = options?.manifest !== false;
 
 	const extracted: string[] = [];
+	const manifestFiles: string[] = [];
 
 	for (const file of files) {
 		if (options?.filter && !options.filter(file.name)) {
@@ -237,6 +248,21 @@ export function unpackLsv(inputPath: string, outputDir: string, options?: Unpack
 		const content = extractFile(data, file, dataOffset);
 		writeFileSync(outPath, content, { flag: "w" });
 		extracted.push(outPath);
+		manifestFiles.push(file.name);
+	}
+
+	if (writeManifest && manifestFiles.length > 0) {
+		const manifestPath = join(outputDir, MANIFEST_NAME);
+		const manifest: { version: number; flags?: number; priority?: number; files: { name: string; flags: number }[] } = {
+			version: header.version,
+			files: manifestFiles.map((name) => {
+				const f = files.find((x) => x.name === name);
+				return { name, flags: f?.flags ?? 33 };
+			})
+		};
+		if (header.flags !== undefined) manifest.flags = header.flags;
+		if (header.priority !== undefined) manifest.priority = header.priority;
+		writeFileSync(manifestPath, JSON.stringify(manifest, null, 0), "utf8");
 	}
 
 	return extracted;

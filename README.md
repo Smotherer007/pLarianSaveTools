@@ -2,7 +2,7 @@
 
 A tool to unpack, edit, and repack savegame files from **Divinity Original Sin 2** and **Baldur's Gate 3**.
 
-> **⚠️ Disclaimer:** DOS2 akzeptiert manipulierte Savegames derzeit **nicht**. Nach dem Entpacken, Bearbeiten und erneuten Packen werden die Speicherstände vom Spiel nicht geladen. Das Tool ist für DOS2 noch nicht einsatzbereit. BG3-Verhalten wurde nicht getestet.
+> **⚠️ Disclaimer:** DOS2 does **not** accept manipulated savegames at this time. After unpacking, editing, and repacking, the game will not load the saves. This tool is not yet functional for DOS2. BG3 has not been tested.
 
 ## What can you do with it?
 
@@ -60,8 +60,8 @@ Use `help` or `--help` to see an overview of all commands.
 
 ## Supported games
 
-- **Divinity Original Sin 2** (DOS2) – ⚠️ manipulierte Saves werden vom Spiel nicht akzeptiert
-- **Baldur's Gate 3** (BG3) – nicht getestet
+- **Divinity Original Sin 2** (DOS2) – ⚠️ manipulated saves are not accepted by the game
+- **Baldur's Gate 3** (BG3) – not tested
 
 ## License
 

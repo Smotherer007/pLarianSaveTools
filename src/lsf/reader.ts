@@ -386,8 +386,18 @@ export class LSFReader {
 
 	private reconstructTree(): LSFNode {
 		if (this.nodes.length === 0) throw new Error("No nodes found");
-		const rootIndices = this.nodes.map((n, i) => (n.parentIndex === -1 ? i : -1)).filter((i) => i >= 0);
+		let rootIndices = this.nodes.map((n, i) => (n.parentIndex === -1 ? i : -1)).filter((i) => i >= 0);
 		if (rootIndices.length === 0) throw new Error("No root node found");
+		if (this.meta.metadataFormat === 1 && rootIndices.length > 1) {
+			const referenced = new Set(rootIndices.map((i) => this.nodes[i].nextSiblingIndex).filter((s) => s >= 0));
+			const first = rootIndices.find((i) => !referenced.has(i)) ?? rootIndices[0];
+			rootIndices = [];
+			let cur: number = first;
+			while (cur >= 0) {
+				rootIndices.push(cur);
+				cur = this.nodes[cur].nextSiblingIndex;
+			}
+		}
 		if (rootIndices.length === 1) {
 			return this.buildNodeRecursive(rootIndices[0], 0);
 		}
@@ -431,9 +441,41 @@ export class LSFReader {
 			attrIdx = attrEntry.nextAttributeIndex;
 		}
 
-		for (let i = 0; i < this.nodes.length; i++) {
-			if (this.nodes[i].parentIndex === nodeIdx) {
-				if (i === nodeIdx) continue;
+		// Kinder in LSF-Reihenfolge (nextSiblingIndex-Kette bei metadataFormat 1)
+		const childIndices = this.nodes
+			.map((n, i) => (n.parentIndex === nodeIdx && i !== nodeIdx ? i : -1))
+			.filter((i) => i >= 0);
+		if (childIndices.length > 0 && this.meta.metadataFormat === 1) {
+			// metadataFormat 1: nextSiblingIndex-Kette für korrekte Reihenfolge
+			const referenced = new Set(childIndices.map((i) => this.nodes[i].nextSiblingIndex).filter((s) => s >= 0));
+			let first = childIndices.find((i) => !referenced.has(i));
+			if (first === undefined) first = childIndices[0];
+			const ordered: number[] = [];
+			let cur: number = first;
+			while (cur >= 0) {
+				ordered.push(cur);
+				cur = this.nodes[cur].nextSiblingIndex;
+			}
+			for (const i of ordered) {
+				node.children.push(this.buildNodeRecursive(i, depth + 1));
+			}
+		} else {
+			// metadataFormat 0: LSLib Node.Children = Dictionary<Name, List<Node>>, LSXWriter iteriert gruppiert nach Name
+			childIndices.sort((a, b) => a - b);
+			const namesInOrder: string[] = [];
+			for (const i of childIndices) {
+				const name = this.resolveName(this.nodes[i].nameIndex);
+				if (!namesInOrder.includes(name)) namesInOrder.push(name);
+			}
+			childIndices.sort((a, b) => {
+				const nameA = this.resolveName(this.nodes[a].nameIndex);
+				const nameB = this.resolveName(this.nodes[b].nameIndex);
+				const posA = namesInOrder.indexOf(nameA);
+				const posB = namesInOrder.indexOf(nameB);
+				if (posA !== posB) return posA - posB;
+				return a - b;
+			});
+			for (const i of childIndices) {
 				node.children.push(this.buildNodeRecursive(i, depth + 1));
 			}
 		}

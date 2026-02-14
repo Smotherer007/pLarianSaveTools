@@ -1,0 +1,20 @@
+sequenceDiagram
+    participant User
+    participant CLI
+    participant LSV as LSV Module
+    participant LSF as LSF Module
+    participant LSX as LSX Module
+
+    User->>CLI: node cli.js extract-lsx save.lsv
+    CLI->>LSV: Entpacken
+    LSV->>LSF: LSF Binärdaten extrahieren
+    LSF->>LSX: In XML konvertieren
+    LSX-->>User: ./extracted/meta.lsx (Editierbar)
+    
+    Note over User: User editiert die XML Datei
+    
+    User->>CLI: node cli.js pack-lsx ./extracted
+    CLI->>LSX: XML einlesen
+    LSX->>LSF: Binärdaten generieren
+    LSF->>LSV: In .lsv Paket packen
+    LSV-->>User: repacked.lsv

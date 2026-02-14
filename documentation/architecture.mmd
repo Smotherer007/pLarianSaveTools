@@ -1,0 +1,14 @@
+graph TD
+    LSV[".lsv (Package File)"] <--> |Unpacker / Packer| LSF[".lsf (Binary Meta/Save)"]
+    LSF <--> |Reader / Writer| NodeTree["In-Memory Node Tree"]
+    NodeTree <--> |LSX Writer / Reader| LSX[".lsx (Readable XML)"]
+    
+    subgraph "Compression Layer"
+        LZ4[LZ4]
+        Zstd[Zstd]
+        Zlib[Zlib]
+    end
+    
+    LSV --- LZ4
+    LSV --- Zstd
+    LSF --- Zlib

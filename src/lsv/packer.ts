@@ -1,6 +1,6 @@
 /**
  * LSV Packer – packt Dateien zurück in ein LSV-Paket
- * Verwendet Manifest von unpack (--manifest) für exakte Roundtrip-Kompatibilität
+ * LSLib-kompatibel: FileEntry15 für v13, Padding 0xAD, CRC32, Manifest-Reihenfolge
  * Unterstützt DOS2 (v13) und BG3 (v15/v16/v18)
  */
 
@@ -12,10 +12,13 @@ import { parseLsx } from "../lsx/lsx-reader.js";
 import { writeLsfToBuffer } from "../lsf/writer.js";
 
 const FILE_ENTRY_10_SIZE = 280;
+const FILE_ENTRY_15_SIZE = 304; // LSLib: Name(256)+Offset(8)+SizeDisk(8)+Uncomp(8)+Part(4)+Flags(4)+Crc(4)+Unknown2(4)
 const FILE_ENTRY_18_SIZE = 272;
 const COMPRESSION_LZ4 = 2;
-/** DOS2 v13: Dateien sind auf 64-Byte-Grenzen ausgerichtet (wie Original) */
+/** DOS2 v13: 64-Byte-Alignment, Padding 0xAD (LSLib) */
 const LSPK_ALIGNMENT = 64;
+const LSPK_PADDING_BYTE = 0xad;
+const MANIFEST_NAME = "__manifest__.json";
 
 function writeU32(buf: Buffer, offset: number, val: number): void {
 	buf.writeUInt32LE(val, offset);
@@ -23,6 +26,21 @@ function writeU32(buf: Buffer, offset: number, val: number): void {
 
 function writeU64(buf: Buffer, offset: number, val: number): void {
 	buf.writeBigUInt64LE(BigInt(val), offset);
+}
+
+/** CRC32 (IEEE) für LSLib v10–v16 Kompatibilität */
+function crc32(buf: Buffer): number {
+	let crc = 0xffffffff;
+	const table = new Uint32Array(256);
+	for (let i = 0; i < 256; i++) {
+		let c = i;
+		for (let k = 0; k < 8; k++) c = (c & 1) ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+		table[i] = c >>> 0;
+	}
+	for (let i = 0; i < buf.length; i++) {
+		crc = table[(crc ^ buf[i]) & 0xff] ^ (crc >>> 8);
+	}
+	return (crc ^ 0xffffffff) >>> 0;
 }
 
 function padNullTerminated(str: string, maxLen: number): Buffer {
@@ -37,28 +55,96 @@ interface FileEntry {
 	flags: number;
 	uncompressedSize: number;
 	archivePart?: number;
+	crc?: number;
 }
 
 /** DOS2 LSV: Zlib für alle Dateien (wie Divine/LSLib) */
 const DEFAULT_LSV_FLAGS = 33; // Zlib + DefaultCompress
 
-/** Verzeichnis rekursiv scannen (wie Divine), versteckte Dateien auslassen */
-function scanDirectory(dir: string): string[] {
-	const files: string[] = [];
+interface ManifestFile {
+	name: string;
+	flags?: number;
+}
+
+interface ScanResult {
+	files: ManifestFile[];
+	headerFlags?: number;
+	headerPriority?: number;
+}
+
+/** Verzeichnis scannen; nutzt __manifest__.json für Reihenfolge + Flags (LSLib-kompatibel) */
+function scanDirectory(dir: string): ManifestFile[] {
+	return scanDirectoryWithManifest(dir).files;
+}
+
+function scanDirectoryWithManifest(dir: string): ScanResult {
+	const manifestPath = join(dir, MANIFEST_NAME);
+	if (existsSync(manifestPath)) {
+		try {
+			const raw = readFileSync(manifestPath, "utf8");
+			const manifest = JSON.parse(raw) as {
+				version?: number;
+				flags?: number;
+				priority?: number;
+				files?: string[] | { name: string; flags?: number }[];
+			};
+			if (Array.isArray(manifest.files) && manifest.files.length > 0) {
+				const files = manifest.files
+					.filter((f) => (typeof f === "string" ? f : f.name) !== MANIFEST_NAME)
+					.map((f) =>
+						typeof f === "string"
+							? { name: f, flags: DEFAULT_LSV_FLAGS }
+							: { name: f.name, flags: f.flags ?? DEFAULT_LSV_FLAGS }
+					);
+				return {
+					files,
+					headerFlags: manifest.flags,
+					headerPriority: manifest.priority
+				};
+			}
+		} catch {
+			/* fallback */
+		}
+	}
+	const fileNames: string[] = [];
 	function walk(base: string) {
 		for (const entry of readdirSync(join(dir, base), { withFileTypes: true })) {
 			const rel = base ? `${base}/${entry.name}` : entry.name;
+			if (entry.name === MANIFEST_NAME) continue;
 			if (entry.isDirectory()) {
 				if (!entry.name.startsWith(".")) walk(rel);
 			} else if (entry.isFile()) {
 				if (!rel.split("/").some((p) => p.startsWith("."))) {
-					files.push(rel.replace(/\\/g, "/"));
+					fileNames.push(rel.replace(/\\/g, "/"));
 				}
 			}
 		}
 	}
 	walk("");
-	return files.sort();
+	return { files: fileNames.sort().map((name) => ({ name, flags: DEFAULT_LSV_FLAGS })) };
+}
+
+/** FileEntry15 (304 B) – LSLib v13 Format mit CRC32 */
+function buildFileListV13(
+	files: FileEntry[],
+	offsets: number[],
+	sizesOnDisk: number[]
+): Buffer {
+	const numFiles = files.length;
+	const buf = Buffer.alloc(numFiles * FILE_ENTRY_15_SIZE);
+	for (let i = 0; i < numFiles; i++) {
+		const f = files[i];
+		const o = i * FILE_ENTRY_15_SIZE;
+		padNullTerminated(f.name, 256).copy(buf, o);
+		writeU64(buf, o + 256, offsets[i]);
+		writeU64(buf, o + 264, sizesOnDisk[i]);
+		writeU64(buf, o + 272, f.uncompressedSize || sizesOnDisk[i]);
+		writeU32(buf, o + 280, f.archivePart ?? 0);
+		writeU32(buf, o + 284, f.flags & 0x0f);
+		writeU32(buf, o + 288, f.crc ?? 0);
+		writeU32(buf, o + 292, 0);
+	}
+	return buf;
 }
 
 function buildFileListDOS2(files: FileEntry[], offsets: number[], sizesOnDisk: number[]): Buffer {
@@ -113,9 +199,10 @@ export function packLsv(inputDir: string, outputPath: string, options?: PackLsvO
 	const sizesOnDisk: number[] = [];
 	let offset = 0;
 
-	const filesToPack: FileEntry[] = scanDirectory(inputDir).map((name) => ({
-		name,
-		flags: DEFAULT_LSV_FLAGS,
+	const { files: scanned, headerFlags, headerPriority } = scanDirectoryWithManifest(inputDir);
+	const filesToPack: FileEntry[] = scanned.map((m) => ({
+		name: m.name,
+		flags: m.flags ?? DEFAULT_LSV_FLAGS,
 		uncompressedSize: 0,
 		archivePart: 0
 	}));
@@ -129,6 +216,7 @@ export function packLsv(inputDir: string, outputPath: string, options?: PackLsvO
 		const uncompressedSize = raw.length;
 		const compressed = f.flags === 0 ? raw : compress(raw, f.flags);
 		f.uncompressedSize = uncompressedSize;
+		if (version >= 10 && version <= 16) f.crc = crc32(compressed);
 		offsets.push(offset);
 		sizesOnDisk.push(compressed.length);
 		if (useAlignment) {
@@ -136,7 +224,7 @@ export function packLsv(inputDir: string, outputPath: string, options?: PackLsvO
 			const padding = aligned - offset - compressed.length;
 			dataChunks.push(compressed);
 			if (padding > 0) {
-				dataChunks.push(Buffer.alloc(padding, 0));
+				dataChunks.push(Buffer.alloc(padding, LSPK_PADDING_BYTE));
 			}
 			offset = aligned;
 		} else {
@@ -147,7 +235,11 @@ export function packLsv(inputDir: string, outputPath: string, options?: PackLsvO
 	const dataBlock = Buffer.concat(dataChunks);
 
 	const bg3DataStart = 40;
-	const fileList = isBG3 ? buildFileListBG3(filesToPack, offsets, sizesOnDisk, bg3DataStart) : buildFileListDOS2(filesToPack, offsets, sizesOnDisk);
+	const fileList = isBG3
+		? buildFileListBG3(filesToPack, offsets, sizesOnDisk, bg3DataStart)
+		: version === 13
+			? buildFileListV13(filesToPack, offsets, sizesOnDisk)
+			: buildFileListDOS2(filesToPack, offsets, sizesOnDisk);
 	const compressedFileList = compress(fileList, COMPRESSION_LZ4);
 	if (compressedFileList.length > fileList.length) {
 		throw new Error(`File list compression fehlgesch: komprimiert ${compressedFileList.length} > unkomprimiert ${fileList.length}`);
@@ -179,12 +271,15 @@ export function packLsv(inputDir: string, outputPath: string, options?: PackLsvO
 
 		output = Buffer.concat([header, dataBlock, numFilesBuf, compressedSizeBuf, compressedFileList]);
 	} else {
-		// DOS2 v13: Trailer am Ende
+		// DOS2 v13: Trailer am Ende (LSPKHeader13: Version, FileListOffset, FileListSize, NumParts, Flags, Priority, Md5[16])
 		const header = Buffer.alloc(32);
 		writeU32(header, 0, version);
 		writeU32(header, 4, fileListOffset);
 		writeU32(header, 8, fileListSize);
-		header.writeUInt16LE(1, 12);
+		header.writeUInt16LE(1, 12); // NumParts
+		header.writeUInt8(headerFlags ?? 0, 14); // Flags
+		header.writeUInt8(headerPriority ?? 0, 15); // Priority
+		header.fill(0, 16, 32); // Md5
 
 		const trailerSize = 40;
 		const trailer = Buffer.alloc(trailerSize);
@@ -207,14 +302,15 @@ export function packLsvFromLsx(inputDir: string, outputPath: string, options?: P
 	const isBG3 = version === 15 || version === 16 || version === 18;
 	const useAlignment = !isBG3;
 
-	const scanned = scanDirectory(inputDir);
+	const { files: scanned, headerFlags, headerPriority } = scanDirectoryWithManifest(inputDir);
 	const filesToPack: FileEntry[] = [];
 	const dataChunks: Buffer[] = [];
 	const offsets: number[] = [];
 	const sizesOnDisk: number[] = [];
 	let offset = 0;
 
-	for (const rel of scanned) {
+	for (const m of scanned) {
+		const rel = m.name;
 		const filePath = join(inputDir, rel);
 		let raw: Buffer;
 		let packageName: string;
@@ -227,13 +323,16 @@ export function packLsvFromLsx(inputDir: string, outputPath: string, options?: P
 			raw = readFileSync(filePath);
 			packageName = rel;
 		}
-		filesToPack.push({
+		const flags = m.flags ?? DEFAULT_LSV_FLAGS;
+		const compressed = compress(raw, flags);
+		const entry: FileEntry = {
 			name: packageName,
-			flags: DEFAULT_LSV_FLAGS,
+			flags,
 			uncompressedSize: raw.length,
 			archivePart: 0
-		});
-		const compressed = compress(raw, DEFAULT_LSV_FLAGS);
+		};
+		if (version >= 10 && version <= 16) entry.crc = crc32(compressed);
+		filesToPack.push(entry);
 		offsets.push(offset);
 		sizesOnDisk.push(compressed.length);
 		if (useAlignment) {
@@ -241,7 +340,7 @@ export function packLsvFromLsx(inputDir: string, outputPath: string, options?: P
 			const padding = aligned - offset - compressed.length;
 			dataChunks.push(compressed);
 			if (padding > 0) {
-				dataChunks.push(Buffer.alloc(padding, 0));
+				dataChunks.push(Buffer.alloc(padding, LSPK_PADDING_BYTE));
 			}
 			offset = aligned;
 		} else {
@@ -253,7 +352,11 @@ export function packLsvFromLsx(inputDir: string, outputPath: string, options?: P
 	const dataBlock = Buffer.concat(dataChunks);
 
 	const bg3DataStart = 40;
-	const fileList = isBG3 ? buildFileListBG3(filesToPack, offsets, sizesOnDisk, bg3DataStart) : buildFileListDOS2(filesToPack, offsets, sizesOnDisk);
+	const fileList = isBG3
+		? buildFileListBG3(filesToPack, offsets, sizesOnDisk, bg3DataStart)
+		: version === 13
+			? buildFileListV13(filesToPack, offsets, sizesOnDisk)
+			: buildFileListDOS2(filesToPack, offsets, sizesOnDisk);
 	const compressedFileList = compress(fileList, COMPRESSION_LZ4);
 
 	const fileListOffset = dataBlock.length;
@@ -289,6 +392,9 @@ export function packLsvFromLsx(inputDir: string, outputPath: string, options?: P
 		writeU32(header, 4, fileListOffset);
 		writeU32(header, 8, fileListSize);
 		header.writeUInt16LE(1, 12);
+		header.writeUInt8(headerFlags ?? 0, 14);
+		header.writeUInt8(headerPriority ?? 0, 15);
+		header.fill(0, 16, 32);
 
 		const trailerSize = 40;
 		const trailer = Buffer.alloc(trailerSize);

@@ -24,36 +24,82 @@ function packEngineVersionBG3(v: LsfVersion): bigint {
 	return (BigInt(v.major & 0x7f) << 55n) | (BigInt(v.minor & 0xff) << 47n) | (BigInt(v.revision & 0xffff) << 31n) | BigInt(v.build & 0x7fffffff);
 }
 
-function collectStrings(node: LSFNode): Set<string> {
-	const names = new Set<string>();
-	names.add(node.name);
-	for (const attr of Object.values(node.attributes)) names.add(attr.name);
-	for (const child of node.children) {
-		for (const s of collectStrings(child)) names.add(s);
+/** C# String.GetHashCode – .NET Framework-Stil für LSLib-Kompatibilität */
+function dotNetStringHashCode(s: string): number {
+	let hash = 0;
+	for (let i = 0; i < s.length; i++) {
+		hash = ((hash << 5) - hash + s.charCodeAt(i)) | 0;
 	}
-	return names;
+	return hash >>> 0;
 }
 
-function buildStringTable(names: Set<string>): { buffer: Buffer; indexMap: Map<string, number> } {
-	const unique = [...names];
+/** LSLib Bucket: (hash & 0x1ff) ^ ((hash>>9) & 0x1ff) ^ ((hash>>18) & 0x1ff) ^ ((hash>>27) & 0x1ff) */
+function hashToBucket(hashCode: number): number {
+	return (
+		(hashCode & 0x1ff) ^
+		((hashCode >> 9) & 0x1ff) ^
+		((hashCode >> 18) & 0x1ff) ^
+		((hashCode >> 27) & 0x1ff)
+	);
+}
+
+/** Strings in LSLib-Reihenfolge: WriteRegions → WriteNode → Name, Attrs, Children (depth-first) */
+function collectStringsInOrder(node: LSFNode, out: string[]): void {
+	out.push(node.name);
+	for (const name of Object.keys(node.attributes)) out.push(name);
+	for (const child of node.children) collectStringsInOrder(child, out);
+}
+
+/** LSLib String-Tabelle: 512 Buckets, (bucket<<16)|offset */
+function buildStringTable(stringsInOrder: string[]): { buffer: Buffer; indexMap: Map<string, number> } {
+	const STRING_HASH_MAP_SIZE = 0x200; // 512
+	const buckets: string[][] = [];
+	for (let i = 0; i < STRING_HASH_MAP_SIZE; i++) buckets.push([]);
 	const indexMap = new Map<string, number>();
-	let offset = 0;
-	for (const s of unique) {
-		indexMap.set(s, (0 << 16) | offset);
-		offset++;
+
+	for (const s of stringsInOrder) {
+		if (indexMap.has(s)) continue;
+		const hashCode = dotNetStringHashCode(s);
+		const bucket = hashToBucket(hashCode);
+		const chain = buckets[bucket];
+		let found = -1;
+		for (let i = 0; i < chain.length; i++) {
+			if (chain[i] === s) {
+				found = i;
+				break;
+			}
+		}
+		if (found >= 0) {
+			indexMap.set(s, (bucket << 16) | found);
+		} else {
+			const offset = chain.length;
+			chain.push(s);
+			indexMap.set(s, (bucket << 16) | offset);
+		}
 	}
-	const buf = Buffer.alloc(4 + 2 + unique.length * (2 + 256));
+
+	let bufSize = 4;
+	for (let i = 0; i < STRING_HASH_MAP_SIZE; i++) {
+		bufSize += 2;
+		for (const s of buckets[i]) {
+			bufSize += 2 + Buffer.byteLength(s, "utf8");
+		}
+	}
+	const buf = Buffer.alloc(bufSize);
 	let off = 0;
-	buf.writeUInt32LE(1, off);
+	buf.writeUInt32LE(STRING_HASH_MAP_SIZE, off);
 	off += 4;
-	buf.writeUInt16LE(unique.length, off);
-	off += 2;
-	for (const s of unique) {
-		const enc = Buffer.from(s, "utf8");
-		buf.writeUInt16LE(enc.length, off);
+	for (let i = 0; i < STRING_HASH_MAP_SIZE; i++) {
+		const chain = buckets[i];
+		buf.writeUInt16LE(chain.length, off);
 		off += 2;
-		enc.copy(buf, off);
-		off += enc.length;
+		for (const s of chain) {
+			const enc = Buffer.from(s, "utf8");
+			buf.writeUInt16LE(enc.length, off);
+			off += 2;
+			enc.copy(buf, off);
+			off += enc.length;
+		}
 	}
 	return { buffer: buf.subarray(0, off), indexMap };
 }
@@ -250,8 +296,13 @@ export function writeLsf(root: LSFNode, outputPath: string, version?: LsfVersion
 	const metadataFormat = options?.metadataFormat ?? (isBG3 ? 1 : 0);
 	const engineVersion = packEngineVersion(v);
 
-	const names = collectStrings(root);
-	const { buffer: stringBuf, indexMap } = buildStringTable(names);
+	const stringsInOrder: string[] = [];
+	if (root.name === "save" && root.children.length > 0) {
+		for (const region of root.children) collectStringsInOrder(region, stringsInOrder);
+	} else {
+		collectStringsInOrder(root, stringsInOrder);
+	}
+	const { buffer: stringBuf, indexMap } = buildStringTable(stringsInOrder);
 
 	const flatNodes: LSFNode[] = [];
 	if (root.name === "save" && root.children.length > 0) {

@@ -8,6 +8,7 @@ dist/
 output_bg3/
 test_pack/
 extracted/
+tmp-verify/
 *.lsv.manifest.json
 
 # Savegame files (können groß sein)

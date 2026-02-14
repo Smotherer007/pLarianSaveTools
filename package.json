@@ -18,7 +18,11 @@
 		"convert": "node dist/cli.js convert",
 		"start": "node dist/cli.js",
 		"dev": "node dist/server.js",
-		"pretty": "npx prettier --write '**/*.{js,ts,json,xml,html,css,scss,md,yaml,yml}'"
+		"pretty": "npx prettier --write '**/*.{js,ts,json,xml,html,css,scss,md,yaml,yml}'",
+		"verify": "node dist/scripts/verify-roundtrip.js",
+		"verify:quick": "node dist/scripts/verify-roundtrip.js --quick",
+		"verify:lsf2lsx": "node dist/scripts/verify-roundtrip.js --lsf2lsx",
+		"verify:unpack": "node dist/scripts/verify-roundtrip.js --unpack"
 	},
 	"keywords": [
 		"dos2",
