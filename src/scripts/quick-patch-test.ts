@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * Schneller Patch-Test: LSV → extract-lsx → meta.lsx ändern → patch → pack
- * Deutlich schneller als voller pack-lsx, da nur meta gepatcht wird.
+ * Quick patch test: LSV → extract-lsx → edit meta.lsx → patch → pack
+ * Much faster than full pack-lsx since only meta is patched.
  *
- * Verwendung:
- *   node dist/scripts/quick-patch-test.js [input.lsv]     - Voll: extract → patch → pack
- *   node dist/scripts/quick-patch-test.js --dir <ordner>   - Schnell: nur patch → pack (bereits extrahiert)
- *   Ohne LSV: nutzt ./QuickSave_14.lsv oder ./QuickSave_14_repacked.lsv
+ * Usage:
+ *   node dist/scripts/quick-patch-test.js [input.lsv]     - Full: extract → patch → pack
+ *   node dist/scripts/quick-patch-test.js --dir <folder>  - Quick: patch → pack only (already extracted)
+ *   Without LSV: uses ./QuickSave_14.lsv or ./QuickSave_14_repacked.lsv
  */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
@@ -81,7 +81,7 @@ function extractLsxFromLsv(inputLsv: string, outputDir: string): void {
 	writeFileSync(join(outputDir, MANIFEST_NAME), JSON.stringify(manifest, null, 2), "utf8");
 }
 
-/** Kleine Änderung in meta.lsx (Difficulty) für schnellen Test */
+/** Small change in meta.lsx (Difficulty) for quick test */
 function applyTestChange(metaLsxPath: string): void {
 	let xml = readFileSync(metaLsxPath, "utf8");
 	// Difficulty: 0=Story, 1=Classic, 2=Tactician, 3=Honour
@@ -91,9 +91,9 @@ function applyTestChange(metaLsxPath: string): void {
 		const newVal = oldVal === "2" ? "1" : "2"; // Tactician ↔ Classic
 		xml = xml.replace(`<attribute id="Difficulty" value="${oldVal}"`, `<attribute id="Difficulty" value="${newVal}"`);
 		writeFileSync(metaLsxPath, xml, "utf8");
-		console.log(`   meta.lsx: Difficulty ${oldVal} → ${newVal} (Test-Änderung)`);
+		console.log(`   meta.lsx: Difficulty ${oldVal} → ${newVal} (test change)`);
 	} else {
-		console.log("   meta.lsx: Keine Difficulty gefunden, unverändert");
+		console.log("   meta.lsx: No Difficulty found, unchanged");
 	}
 }
 
@@ -124,7 +124,7 @@ function main() {
 			console.error("Verwendung:");
 			console.error("  node dist/scripts/quick-patch-test.js <input.lsv>");
 			console.error("  node dist/scripts/quick-patch-test.js --dir <extracted-folder>  # Schnell: nur patch+pack");
-			console.error("  Oder QuickSave_14.lsv ins Projektverzeichnis legen.");
+			console.error("  Or place QuickSave_14.lsv in project directory.");
 			process.exit(1);
 		}
 
@@ -136,13 +136,13 @@ function main() {
 		// 1. Extract
 		console.log("1. extract-lsx...");
 		extractLsxFromLsv(inputLsv, TMP);
-		console.log("   Fertig.\n");
+		console.log("   Done.\n");
 		workDir = TMP;
 	}
 
 	const metaLsx = join(workDir, "meta.lsx");
 	if (!existsSync(metaLsx)) {
-		console.error("meta.lsx nicht gefunden");
+		console.error("meta.lsx not found");
 		process.exit(1);
 	}
 
@@ -156,10 +156,10 @@ function main() {
 	const offsetsPath = metaLsx + ".offsets.json";
 	const baseLsfPath = metaLsx + ".base.lsf";
 	const origLsfPath = metaLsx.replace(/\.lsx$/i, ".lsf");
-	// .base.lsf (extract-lsx) oder meta.lsf (unpack+convert) als Original-Basis
+	// .base.lsf (extract-lsx) or meta.lsf (unpack+convert) as original base
 	const basePath = existsSync(baseLsfPath) ? baseLsfPath : (existsSync(origLsfPath) ? origLsfPath : null);
 	if (!basePath || !existsSync(offsetsPath)) {
-		console.error("Fehler: meta.lsx benötigt .offsets.json und .lsf oder .base.lsf");
+		console.error("Error: meta.lsx requires .offsets.json and .lsf or .base.lsf");
 		process.exit(1);
 	}
 	const baseLsf = readFileSync(basePath);
@@ -176,7 +176,7 @@ function main() {
 	packLsvFromLsx(workDir, repackedPath, { version: 13 });
 	console.log("   Fertig.\n");
 
-	console.log(`✓ ${repackedPath} erstellt – im Spiel testen.\n`);
+		console.log(`✓ ${repackedPath} created – test in game.\n`);
 }
 
 main();

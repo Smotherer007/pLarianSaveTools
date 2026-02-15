@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * Test: meta.lsx Patch-Roundtrip
+ * Test: meta.lsx patch roundtrip
  * 1. meta.lsx → meta.lsf (convert)
- * 2. LSF lesen, Offset-Map erstellen
+ * 2. Read LSF, create offset map
  * 3. patchLsfValues(meta.lsf, offsetMap, meta.lsx)
- * 4. Ergebnis mit Original-LSF vergleichen (sollte byte-identisch sein)
+ * 4. Compare result with original LSF (should be byte-identical)
  */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
@@ -23,22 +23,22 @@ function main() {
 	mkdirSync(TMP, { recursive: true });
 
 	if (!existsSync(META_LSX)) {
-		console.error("meta.lsx nicht gefunden:", META_LSX);
+		console.error("meta.lsx not found:", META_LSX);
 		process.exit(1);
 	}
 
 	console.log("=== meta.lsx Patch-Test ===\n");
 
 	// 1. meta.lsx → meta.lsf
-	console.log("1. Konvertiere meta.lsx → meta.lsf");
+		console.log("1. Convert meta.lsx → meta.lsf");
 	const { root, version } = parseLsx(META_LSX);
 	const opts = version.major >= 4 ? undefined : { metadataFormat: 0 };
 	writeLsf(root, META_LSF, version, opts);
 	const originalLsf = readFileSync(META_LSF);
 	console.log(`   meta.lsf: ${originalLsf.length} Bytes`);
 
-	// 2. Offset-Map aus LSF
-	console.log("2. Lese LSF, erstelle Offset-Map");
+	// 2. Offset map from LSF
+	console.log("2. Read LSF, create offset map");
 	const reader = new LSFReader(originalLsf);
 	reader.read();
 	const offsetMapRaw = reader.getAttributeOffsetMap();
@@ -52,21 +52,21 @@ function main() {
 	console.log(`   ${attrCount} Attribute in Offset-Map`);
 
 	// 3. Patch
-	console.log("3. Patch meta.lsf mit Werten aus meta.lsx");
+	console.log("3. Patch meta.lsf with values from meta.lsx");
 	const { root: lsxRoot } = parseLsx(META_LSX);
 	const patched = patchLsfValues(originalLsf, offsetMap, lsxRoot);
-	console.log(`   Gepatcht: ${patched.length} Bytes`);
+		console.log(`   Patched: ${patched.length} bytes`);
 
 	// 4. Vergleich
 	const match = originalLsf.equals(patched);
 	if (match) {
-		console.log("\n✓ ERFOLG: Gepatchte LSF ist byte-identisch mit Original");
+		console.log("\n✓ SUCCESS: Patched LSF is byte-identical with original");
 	} else {
-		console.log("\n✗ Abweichung: Gepatchte LSF unterscheidet sich");
-		console.log(`  Original: ${originalLsf.length} B, Gepatcht: ${patched.length} B`);
-		// Optional: gepatchte Datei speichern zum Debuggen
+		console.log("\n✗ Mismatch: Patched LSF differs");
+		console.log(`  Original: ${originalLsf.length} B, Patched: ${patched.length} B`);
+		// Optional: save patched file for debugging
 		writeFileSync(join(TMP, "meta-patched.lsf"), patched);
-		console.log("  Gepatchte Datei gespeichert: tmp-verify/meta-patched.lsf");
+		console.log("  Patched file saved: tmp-verify/meta-patched.lsf");
 	}
 
 	process.exit(match ? 0 : 1);

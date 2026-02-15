@@ -50,7 +50,7 @@ function readHeader(data: Buffer): { header: PackageHeader; headerOffset: number
 	if (sigAtStart === LSPK_SIGNATURE && fileSize >= 44) {
 		const version = readU32(data, 4);
 		if (version === 15 || version === 16 || version === 18) {
-			throw new Error("BG3/v10+ LSV-Format wird nicht unterstützt. Nur DOS2 (v13).");
+			throw new Error("BG3/v10+ LSV format not supported. DOS2 (v13) only.");
 		}
 	}
 

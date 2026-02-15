@@ -53,7 +53,7 @@ export function compressLZ4(data: Buffer): Buffer {
 	return out.subarray(0, written);
 }
 
-/** Zlib mit Default-Level (78 9c) – wie DOS2/LSLib, nicht Max (78 da) */
+/** Zlib with default level (78 9c) – like DOS2/LSLib, not max (78 da) */
 export function compressZlib(data: Buffer): Buffer {
 	return deflateSync(data, { level: -1 });
 }

@@ -40,63 +40,63 @@ Use `extract-lsx` to unpack an LSV file and convert all LSF files to LSX in one 
 node dist/cli.js extract-lsx Kiss.lsv ./lsx-only
 ```
 
-### Patch-Workflow (einzelne Dateien bearbeiten)
+### Patch workflow (edit individual files)
 
-Zum gezielten Bearbeiten einzelner Dateien (z.B. nur `meta` für Difficulty) ohne vollständige Re-Serialisierung:
+To edit specific files (e.g. only `meta` for Difficulty) without full re-serialization:
 
-1. **Unpack** – LSV entpacken (LSF-Dateien)
+1. **Unpack** – Extract LSV (LSF files)
    ```bash
    node dist/cli.js unpack Kiss.lsv ./extracted
    ```
 
-2. **Convert** – nur die zu bearbeitende Datei zu LSX konvertieren (erzeugt `.offsets.json` für den Patch)
+2. **Convert** – Convert only the file to edit to LSX (creates `.offsets.json` for patching)
    ```bash
    node dist/cli.js convert ./extracted/meta.lsf ./extracted/meta.lsx
    ```
 
-3. **Bearbeiten** – `meta.lsx` im Texteditor öffnen und ändern (z.B. Difficulty, Spielername)
+3. **Edit** – Open `meta.lsx` in a text editor and modify (e.g. Difficulty, player name)
 
-4. **Pack** – Ordner zurück packen (nutzt Patch: nur geänderte Werte werden injiziert)
+4. **Pack** – Repack the folder (uses patch: only changed values are injected)
    ```bash
    node dist/cli.js pack-lsx ./extracted Kiss_repacked.lsv
    ```
 
-5. **Optional: Aufräumen** – LSX und Offsets nach dem Packen löschen
+5. **Optional: Cleanup** – Remove LSX and offsets after packing
    ```bash
    node dist/cli.js pack-lsx ./extracted Kiss_repacked.lsv --cleanup
    ```
 
-**Alternative: Nur LSF patchen (ohne LSV neu zu packen)** – Änderungen aus LSX direkt in die LSF überführen:
+**Alternative: Patch LSF only (without repacking LSV)** – Apply LSX changes directly to LSF:
 ```bash
 node dist/cli.js patch ./extracted/meta.lsx --cleanup
-# oder alle LSX im Ordner:
+# or all LSX in folder:
 node dist/cli.js patch ./extracted --cleanup
 ```
 
 ### Repack a savegame
 
-**Pack (LSF-Dateien):** Scannt das Verzeichnis und packt alle Dateien mit Zlib (wie [Divine](https://github.com/fireundubh/divine)).
+**Pack (LSF files):** Scans the directory and packs all files with Zlib (like [Divine](https://github.com/fireundubh/divine)).
 
-**Pack-LSX (LSX-Dateien):** Scannt das Verzeichnis, konvertiert LSX→LSF und packt alles. Bei vorhandenen `.offsets.json` wird ein Patch durchgeführt (minimale Änderungen).
+**Pack-LSX (LSX files):** Scans the directory, converts LSX→LSF and packs everything. With `.offsets.json` present, a patch is applied (minimal changes).
 
 ### Convert LSF to LSX (for editing)
 
-LSF files are binary and hard to read. After converting to LSX you can edit them with a text editor. Bei LSF→LSX werden zusätzlich `.offsets.json` erzeugt (für den Patch-Workflow).
+LSF files are binary and hard to read. After converting to LSX you can edit them with a text editor. LSF→LSX also creates `.offsets.json` (for the patch workflow).
 
-### Schneller Patch-Test
+### Quick patch test
 
-Zum schnellen Testen von LSX-Änderungen im Spiel (ohne jedes Mal volles pack-lsx):
+To quickly test LSX changes in-game (without full pack-lsx each time):
 
 ```bash
-# Einmalig: LSV extrahieren
+# One-time: extract LSV
 node dist/cli.js extract-lsx QuickSave_14.lsv ./extracted
 
-# meta.lsx bearbeiten, dann:
+# Edit meta.lsx, then:
 npm run test:patch -- --dir ./extracted
-# → erzeugt QuickSave_14_patch_test.lsv (nur patch + pack, sehr schnell)
+# → creates QuickSave_14_patch_test.lsv (patch + pack only, very fast)
 ```
 
-Oder alles in einem Durchlauf: `npm run test:patch` (mit QuickSave_14.lsv im Projektordner).
+Or run everything at once: `npm run test:patch` (with QuickSave_14.lsv in project folder).
 
 ### Command reference
 
@@ -105,12 +105,46 @@ Oder alles in einem Durchlauf: `npm run test:patch` (mit QuickSave_14.lsv im Pro
 | Unpack                            | `node dist/cli.js unpack file.lsv target-folder`                     |
 | **LSV → LSX (+ PNG etc.)**        | `node dist/cli.js extract-lsx file.lsv target-folder`               |
 | Repack (LSX)                      | `node dist/cli.js pack-lsx source-folder output.lsv`                  |
-| Repack (LSX) + Aufräumen         | `node dist/cli.js pack-lsx source-folder output.lsv --cleanup`       |
+| Repack (LSX) + cleanup           | `node dist/cli.js pack-lsx source-folder output.lsv --cleanup`       |
 | Repack (LSF)                      | `node dist/cli.js pack source-folder output.lsv`                      |
-| **LSX → LSF patchen**             | `node dist/cli.js patch file.lsx [--cleanup]`                         |
-| **LSX → LSF patchen (Ordner)**    | `node dist/cli.js patch folder [--cleanup]`                           |
+| **LSX → LSF patch**               | `node dist/cli.js patch file.lsx [--cleanup]`                         |
+| **LSX → LSF patch (folder)**     | `node dist/cli.js patch folder [--cleanup]`                           |
+| **Patch single value**           | `node dist/cli.js patch-value file.lsf <path> <value>`               |
+| **Read value**                   | `node dist/cli.js get-value file.lsf <path>`                         |
 | LSF → LSX                         | `node dist/cli.js convert file.lsf file.lsx`                          |
+| **Offsets only**                 | `node dist/cli.js convert file.lsf --offsets-only`                  |
 | LSX → LSF                         | `node dist/cli.js convert file.lsx file.lsf`                         |
+
+### Read/patch single value (for API/frontend)
+
+Without parsing LSX – use path directly. Paths from `.offsets.json`:
+
+```bash
+# Create offsets only (fast, no LSX)
+node dist/cli.js convert meta.lsf --offsets-only
+
+# Read value
+node dist/cli.js get-value meta.lsf MetaData/MetaData/Difficulty
+
+# Patch value
+node dist/cli.js patch-value meta.lsf MetaData/MetaData/Difficulty 2
+```
+
+Programmatic usage:
+
+```ts
+import { getLsfValue, getLsfValueAtOffset, patchLsfValue, patchLsfAtOffset } from "dos2-savegame-tools";
+
+// Read value
+const value = getLsfValue(lsfBuffer, offsetMap, "MetaData/MetaData/Difficulty");
+
+// Patch value
+const patched = patchLsfValue(lsfBuffer, offsetMap, "MetaData/MetaData/Difficulty", 2);
+
+// With raw offset (when offset/length/type known)
+const value = getLsfValueAtOffset(lsfBuffer, offset, length, type);
+const patched = patchLsfAtOffset(lsfBuffer, offset, length, type, value);
+```
 
 ### Help
 
@@ -122,4 +156,4 @@ Use `help` or `--help` to see an overview of all commands.
 
 ## License
 
-Apache License 2.0 – siehe [LICENSE](LICENSE) für Details.
+Apache License 2.0 – see [LICENSE](LICENSE) for details.

@@ -13,18 +13,18 @@ export interface LsfVersion {
 	build: number;
 }
 
-/** Engine-Version zu LSF-Header-Format (LSF v3): high byte = major*16+minor */
+/** Engine version to LSF header format (LSF v3): high byte = major*16+minor */
 function packEngineVersion(v: LsfVersion): number {
 	const high = ((v.major & 0xf) << 4) | (v.minor & 0xf);
 	return (high << 24) | ((v.revision & 0xff) << 16) | ((v.build & 0xff) << 8);
 }
 
-/** Engine-Version zu LSF v5+ Int64-Format */
+/** Engine version to LSF v5+ Int64 format */
 function packEngineVersionV5(v: LsfVersion): bigint {
 	return (BigInt(v.major & 0x7f) << 55n) | (BigInt(v.minor & 0xff) << 47n) | (BigInt(v.revision & 0xffff) << 31n) | BigInt(v.build & 0x7fffffff);
 }
 
-/** C# String.GetHashCode – .NET Framework-Stil (hash = 31*hash + char) für LSLib-Kompatibilität. */
+/** C# String.GetHashCode – .NET Framework style (hash = 31*hash + char) for LSLib compatibility. */
 function dotNetStringHashCode(s: string): number {
 	let hash = 0;
 	for (let i = 0; i < s.length; i++) {
@@ -113,7 +113,7 @@ function flattenNodes(node: LSFNode, parentIdx: number, result: LSFNode[]): numb
 	return idx;
 }
 
-/** Pre-Order: Eltern-Attribute vor Kindern (ältere LSF/V13). */
+/** Pre-order: parent attributes before children (older LSF/V13). */
 function collectAttrsPreOrder(
 	node: LSFNode,
 	flatNodes: LSFNode[],
@@ -331,7 +331,7 @@ function getAttributeLength(attr: LSFAttribute, isBG3: boolean = false): number 
 	return serializeAttributeValue(attr, isBG3).length;
 }
 
-/** LZ4-Block (für Strings – LSLib nutzt allowChunked=false) */
+/** LZ4 block (for strings – LSLib uses allowChunked=false) */
 function compressBlock(data: Buffer): Buffer {
 	if (data.length === 0) return data;
 	const maxOut = lz4.encodeBound(data.length);
@@ -346,7 +346,7 @@ function compressBlock(data: Buffer): Buffer {
 	return written > 0 ? out.subarray(0, written) : data;
 }
 
-/** LZ4-Frame (chunked) für nodes/attrs/values – LSLib Format: blockIndependence=0, 64KB, HC */
+/** LZ4-Frame (chunked) for nodes/attrs/values – LSLib format: blockIndependence=0, 64KB, HC */
 function compressChunked(data: Buffer): Buffer {
 	if (data.length === 0) return data;
 	const frame = lz4.encode(data, {
@@ -368,9 +368,9 @@ export interface LSFStringTable {
 export interface WriteLsfOptions {
 	/** 0 = V2 (12 B/node, 12 B/attr, kompakter), 1 = V3 (16 B). DOS2 nutzt 0. */
 	metadataFormat?: number;
-	/** Original-String-Tabelle übernehmen für byte-identischen Roundtrip (nur bestehende Objekte). */
+	/** Preserve original string table for byte-identical roundtrip (existing objects only). */
 	preserveStringTable?: LSFStringTable;
-	/** Original-Values-Buffer + Offset-Map für byte-identische Werte (z.B. Bool 0xf7 vs 0x01). */
+	/** Original values buffer + offset map for byte-identical values (e.g. Bool 0xf7 vs 0x01). */
 	preserveOriginalValues?: { valuesBuffer: Buffer; offsetMap: Map<string, { offset: number; length: number; type: number }> };
 	/** Attribut-Reihenfolge: true = Pre-Order (V13), false = LSLib-Order (V14+). Default: LSLib. */
 	attributeOrderPreOrder?: boolean;
@@ -395,7 +395,7 @@ export function writeLsf(root: LSFNode, outputPath: string, version?: LsfVersion
 		const { buffer, indexMap: im } = options.preserveStringTable;
 		for (const s of stringsInOrder) {
 			if (!im.has(s)) {
-				throw new Error(`LSF-Writer: String "${s}" nicht in preserveStringTable – nur bestehende Objekte erlaubt`);
+				throw new Error(`LSF writer: String "${s}" not in preserveStringTable – only existing objects allowed`);
 			}
 		}
 		stringBuf = buffer;
@@ -422,7 +422,7 @@ export function writeLsf(root: LSFNode, outputPath: string, version?: LsfVersion
 	const attrIdxByNode: number[][] = [];
 	for (let i = 0; i < flatNodes.length; i++) attrIdxByNode.push([]);
 
-	// Attribut-Reihenfolge: Pre-Order (V13) oder LSLib-Order (V14+)
+	// Attribute order: Pre-order (V13) or LSLib order (V14+)
 	const attrsPostOrder: { nodeIdx: number; name: string; attr: LSFAttribute; path: string }[] = [];
 	const collectAttrs = options?.attributeOrderPreOrder ? collectAttrsPreOrder : collectAttrsLslibOrder;
 	for (let i = 0; i < flatNodes.length; i++) {
@@ -582,7 +582,7 @@ export function writeLsf(root: LSFNode, outputPath: string, version?: LsfVersion
 	writeFileSync(outputPath, output);
 }
 
-/** LSF als Buffer schreiben (für In-Memory-Packing). */
+/** Write LSF as Buffer (for in-memory packing). */
 export function writeLsfToBuffer(root: LSFNode, version?: LsfVersion, options?: WriteLsfOptions): Buffer {
 	const tmp = join(tmpdir(), `lsf-${Date.now()}-${Math.random().toString(36).slice(2)}.lsf`);
 	writeLsf(root, tmp, version, options);

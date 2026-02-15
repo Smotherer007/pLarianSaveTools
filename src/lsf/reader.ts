@@ -511,9 +511,9 @@ export class LSFReader {
 	}
 
 	/**
-	 * Liefert eine Map von Attribut-Pfaden zu { offset, length, type } im Values-Buffer.
-	 * Pfad-Format: "Region/Node/Node[1]/AttrName" (Index bei mehrfachen Geschwistern gleichen Namens).
-	 * Muss nach read() aufgerufen werden.
+	 * Returns a map of attribute paths to { offset, length, type } in the values buffer.
+	 * Path format: "Region/Node/Node[1]/AttrName" (index for multiple siblings with same name).
+	 * Must be called after read().
 	 */
 	public getAttributeOffsetMap(): Map<string, { offset: number; length: number; type: NodeAttributeType }> {
 		const result = new Map<string, { offset: number; length: number; type: NodeAttributeType }>();

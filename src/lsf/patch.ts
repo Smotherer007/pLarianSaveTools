@@ -1,6 +1,6 @@
 /**
- * In-Place-Patch: Werte aus LSX in die LSF injizieren ohne vollständige Re-Serialisierung.
- * Nutzt die Offset-Tabelle (.offsets.json) um nur den Values-Block zu ändern.
+ * In-place patch: Inject values from LSX into LSF without full re-serialization.
+ * Uses the offset table (.offsets.json) to modify only the values block.
  */
 
 import { LSFNode, LSFAttribute, NodeAttributeType } from "./types.js";
@@ -28,7 +28,7 @@ function compressBlock(data: Buffer): Buffer {
 	return written > 0 ? out.subarray(0, written) : data;
 }
 
-/** LZ4-Frame (chunked) für values – wie LSLib/DOS2 */
+/** LZ4-Frame (chunked) for values – like LSLib/DOS2 */
 function compressChunked(data: Buffer): Buffer {
 	if (data.length === 0) return data;
 	const frame = lz4.encode(data, {
@@ -42,7 +42,7 @@ function compressChunked(data: Buffer): Buffer {
 	return Buffer.isBuffer(frame) ? frame : Buffer.from(frame);
 }
 
-/** Prüft ob Wert semantisch gleich (z.B. Bool: 0xf7 und 0x01 beide true) – dann Original-Bytes behalten für Byte-Identität. */
+/** Check if value is semantically equal (e.g. Bool: 0xf7 and 0x01 both true) – keep original bytes for byte-identity. */
 function isSemanticallyEqual(type: number, value: unknown, orig: Buffer, serialized: Buffer): boolean {
 	if (type === NodeAttributeType.Bool) {
 		const origVal = orig.length >= 1 ? orig[0] !== 0 : false;
@@ -57,7 +57,76 @@ function isSemanticallyEqual(type: number, value: unknown, orig: Buffer, seriali
 	return false;
 }
 
-/** Serialisiert einen Attribut-Wert zu Bytes (wie LSF-Writer). */
+/** Deserialize bytes from the values block to a JavaScript value. */
+function deserializeAttributeValue(buf: Buffer, type: number): unknown {
+	if (buf.length === 0) return type === NodeAttributeType.String || type === NodeAttributeType.Path ? "" : 0;
+	switch (type) {
+		case NodeAttributeType.Byte:
+		case NodeAttributeType.Int8:
+			return buf.readInt8(0);
+		case NodeAttributeType.Short:
+			return buf.length >= 2 ? buf.readInt16LE(0) : 0;
+		case NodeAttributeType.UShort:
+			return buf.length >= 2 ? buf.readUInt16LE(0) : 0;
+		case NodeAttributeType.Int:
+			return buf.length >= 4 ? buf.readInt32LE(0) : 0;
+		case NodeAttributeType.UInt:
+			return buf.length >= 4 ? buf.readUInt32LE(0) : 0;
+		case NodeAttributeType.Float:
+			return buf.length >= 4 ? buf.readFloatLE(0) : 0;
+		case NodeAttributeType.Double:
+			return buf.length >= 8 ? buf.readDoubleLE(0) : 0;
+		case NodeAttributeType.Bool:
+			return buf.length >= 1 ? buf[0] !== 0 : false;
+		case NodeAttributeType.String:
+		case NodeAttributeType.Path:
+		case NodeAttributeType.FixedString:
+		case NodeAttributeType.LSString:
+		case NodeAttributeType.WString:
+		case NodeAttributeType.LSWString: {
+			const content = buf.subarray(0, buf.length - 1);
+			let last = content.length;
+			while (last > 0 && content[last - 1] === 0) last--;
+			return content.subarray(0, last).toString("utf8");
+		}
+		case NodeAttributeType.UUID: {
+			if (buf.length !== 16) return buf.toString("hex");
+			const b = Buffer.from(buf);
+			for (let i = 8; i < 16; i += 2) [b[i], b[i + 1]] = [b[i + 1], b[i]];
+			return [b.subarray(0, 4), b.subarray(4, 6), b.subarray(6, 8), b.subarray(8, 10), b.subarray(10, 16)].map((x) => x.toString("hex")).join("-");
+		}
+		case NodeAttributeType.TranslatedString: {
+			if (buf.length < 8) return { value: "", handle: "" };
+			let pos = 0;
+			const valueLen = buf.readInt32LE(pos);
+			pos += 4;
+			let value = "";
+			if (valueLen > 0 && buf.length >= pos + valueLen) {
+				value = (deserializeAttributeValue(buf.subarray(pos, pos + valueLen), NodeAttributeType.String) as string) || "";
+				pos += valueLen;
+			}
+			if (buf.length < pos + 4) return { value, handle: "" };
+			const handleLen = buf.readInt32LE(pos);
+			pos += 4;
+			let handle = "";
+			if (handleLen > 0 && buf.length >= pos + handleLen) {
+				handle = (deserializeAttributeValue(buf.subarray(pos, pos + handleLen), NodeAttributeType.String) as string) || "";
+			}
+			return { value, handle };
+		}
+		case NodeAttributeType.ScratchBuffer:
+			return buf.toString("base64");
+		case NodeAttributeType.ULongLong:
+			return buf.length >= 8 ? buf.readBigUInt64LE(0).toString() : "0";
+		case NodeAttributeType.Long:
+		case NodeAttributeType.Int64:
+			return buf.length >= 8 ? buf.readBigInt64LE(0).toString() : "0";
+		default:
+			return buf.toString("utf8", 0, buf.indexOf(0) >= 0 ? buf.indexOf(0) : buf.length);
+	}
+}
+
+/** Serialize an attribute value to bytes (like LSF writer). */
 function serializeAttributeValue(attr: LSFAttribute): Buffer {
 	const { type, value } = attr;
 	switch (type) {
@@ -131,8 +200,8 @@ function serializeAttributeValue(attr: LSFAttribute): Buffer {
 			return out;
 		}
 		case NodeAttributeType.TranslatedFSString:
-			// Komplexe Struktur – für Patch: Länge muss passen, sonst Fehler
-			throw new Error("TranslatedFSString-Patch noch nicht implementiert");
+			// Complex structure – for patch: length must match
+			throw new Error("TranslatedFSString patch not yet implemented");
 		case NodeAttributeType.ScratchBuffer: {
 			const decoded = Buffer.from(String(value ?? ""), "base64");
 			return decoded;
@@ -142,7 +211,7 @@ function serializeAttributeValue(attr: LSFAttribute): Buffer {
 	}
 }
 
-/** Sammelt alle Attribute aus dem LSX-Baum mit Pfaden (Format wie getAttributeOffsetMap). */
+/** Collect all attributes from LSX tree with paths (format like getAttributeOffsetMap). */
 function collectAttributesByPath(
 	node: LSFNode,
 	pathPrefix: string,
@@ -196,11 +265,157 @@ function decompressBlock(
 }
 
 /**
- * Patched den Values-Block der LSF mit Werten aus dem LSX-Baum.
- * @param originalLsf - Original-LSF als Buffer
- * @param offsetMap - Offset-Tabelle (aus .offsets.json)
- * @param lsxRoot - Geparster LSX-Baum
- * @returns Gepatchter LSF-Buffer
+ * Read a single value from LSF by path and offset map.
+ * For frontend/API: read value without LSX parsing.
+ *
+ * @param lsf - LSF as Buffer
+ * @param offsetMap - Offset table (from .offsets.json)
+ * @param path - Attribute path (e.g. "MetaData/MetaData/Difficulty")
+ * @returns The read value (String, Number, Boolean etc. depending on type)
+ */
+export function getLsfValue(lsf: Buffer, offsetMap: OffsetMap, path: string): unknown {
+	const info = offsetMap.attributes[path];
+	if (!info) {
+		throw new Error(`Path not in offset map: ${path}`);
+	}
+	return getLsfValueAtOffset(lsf, info.offset, info.length, info.type);
+}
+
+/**
+ * Read a single value at a raw offset.
+ *
+ * @param lsf - LSF as Buffer
+ * @param offset - Offset in decompressed values block
+ * @param length - Length in bytes
+ * @param type - NodeAttributeType
+ * @returns The read value
+ */
+export function getLsfValueAtOffset(lsf: Buffer, offset: number, length: number, type: number): unknown {
+	const valuesBuf = extractValuesBlock(lsf);
+	const buf = valuesBuf.subarray(offset, offset + length);
+	return deserializeAttributeValue(buf, type);
+}
+
+/** Decompress the values block of the LSF. */
+function extractValuesBlock(lsf: Buffer): Buffer {
+	const headerSize = 12;
+	const metaSize = 40;
+	const o = headerSize;
+	const stringsMeta = { uncompressedSize: lsf.readUInt32LE(o), compressedSize: lsf.readUInt32LE(o + 4) };
+	const nodesMeta = { uncompressedSize: lsf.readUInt32LE(o + 8), compressedSize: lsf.readUInt32LE(o + 12) };
+	const attrsMeta = { uncompressedSize: lsf.readUInt32LE(o + 16), compressedSize: lsf.readUInt32LE(o + 20) };
+	const valuesMeta = { uncompressedSize: lsf.readUInt32LE(o + 24), compressedSize: lsf.readUInt32LE(o + 28) };
+	const compressionFlags = lsf.readUInt32LE(o + 32);
+	const method = compressionFlags & 0x0f;
+	const blockSize = (m: { uncompressedSize: number; compressedSize: number }) => (m.compressedSize > 0 ? m.compressedSize : m.uncompressedSize);
+	let pos = headerSize + metaSize;
+	pos += blockSize(stringsMeta) + blockSize(nodesMeta) + blockSize(attrsMeta);
+	const valuesRaw = lsf.subarray(pos, pos + blockSize(valuesMeta));
+	return decompressBlock(valuesRaw, valuesMeta, method);
+}
+
+/**
+ * Patch a single value in LSF by path and offset map.
+ * For frontend/API: single change without LSX parsing.
+ *
+ * @param originalLsf - Original LSF as Buffer
+ * @param offsetMap - Offset table (from .offsets.json)
+ * @param path - Attribute path (e.g. "save/region/Difficulty")
+ * @param value - New value (String, Number, Boolean etc. depending on type)
+ * @returns Patched LSF buffer
+ * @throws if path not in offsetMap or serialized value > original length
+ */
+export function patchLsfValue(
+	originalLsf: Buffer,
+	offsetMap: OffsetMap,
+	path: string,
+	value: unknown
+): Buffer {
+	const info = offsetMap.attributes[path];
+	if (!info) {
+		throw new Error(`Path not in offset map: ${path}`);
+	}
+	return patchLsfAtOffset(originalLsf, info.offset, info.length, info.type, value);
+}
+
+/**
+ * Patch a single value at a raw offset.
+ * For API: when offset/length/type already known (e.g. from own cache).
+ *
+ * @param originalLsf - Original LSF as Buffer
+ * @param offset - Offset in decompressed values block
+ * @param length - Max length (new serialized value must not be longer)
+ * @param type - NodeAttributeType
+ * @param value - New value
+ * @returns Patched LSF buffer
+ */
+export function patchLsfAtOffset(
+	originalLsf: Buffer,
+	offset: number,
+	length: number,
+	type: number,
+	value: unknown
+): Buffer {
+	const attr: LSFAttribute = { name: "", type, value };
+	const newBytes = serializeAttributeValue(attr);
+	if (newBytes.length > length) {
+		throw new Error(`Value too long: ${newBytes.length} > ${length} (type ${type})`);
+	}
+	return patchLsfRaw(originalLsf, offset, length, newBytes);
+}
+
+/** Internal: Replace bytes in values block at offset with newBytes (null-pad if shorter). */
+function patchLsfRaw(
+	originalLsf: Buffer,
+	valuesOffset: number,
+	valuesLength: number,
+	newBytes: Buffer
+): Buffer {
+	const headerSize = 12;
+	const metaSize = 40;
+	const o = headerSize;
+	const stringsMeta = { uncompressedSize: originalLsf.readUInt32LE(o), compressedSize: originalLsf.readUInt32LE(o + 4) };
+	const nodesMeta = { uncompressedSize: originalLsf.readUInt32LE(o + 8), compressedSize: originalLsf.readUInt32LE(o + 12) };
+	const attrsMeta = { uncompressedSize: originalLsf.readUInt32LE(o + 16), compressedSize: originalLsf.readUInt32LE(o + 20) };
+	const valuesMeta = { uncompressedSize: originalLsf.readUInt32LE(o + 24), compressedSize: originalLsf.readUInt32LE(o + 28) };
+	const compressionFlags = originalLsf.readUInt32LE(o + 32);
+	const method = compressionFlags & 0x0f;
+
+	const blockSize = (m: { uncompressedSize: number; compressedSize: number }) => (m.compressedSize > 0 ? m.compressedSize : m.uncompressedSize);
+	let pos = headerSize + metaSize;
+	const stringsRaw = originalLsf.subarray(pos, pos + blockSize(stringsMeta));
+	pos += blockSize(stringsMeta);
+	const nodesRaw = originalLsf.subarray(pos, pos + blockSize(nodesMeta));
+	pos += blockSize(nodesMeta);
+	const attrsRaw = originalLsf.subarray(pos, pos + blockSize(attrsMeta));
+	pos += blockSize(attrsMeta);
+	const valuesRaw = originalLsf.subarray(pos, pos + blockSize(valuesMeta));
+
+	let valuesBuf = decompressBlock(valuesRaw, valuesMeta, method);
+	newBytes.copy(valuesBuf, valuesOffset);
+	if (newBytes.length < valuesLength) {
+		valuesBuf.fill(0, valuesOffset + newBytes.length, valuesOffset + valuesLength);
+	}
+
+	const valuesCompressed = compressChunked(valuesBuf);
+	const metaBlock = Buffer.from(originalLsf.subarray(headerSize, headerSize + metaSize));
+	metaBlock.writeUInt32LE(valuesCompressed.length, 28);
+	return Buffer.concat([
+		originalLsf.subarray(0, headerSize),
+		metaBlock,
+		stringsRaw,
+		nodesRaw,
+		attrsRaw,
+		valuesCompressed
+	]);
+}
+
+/**
+ * Patch the values block of LSF with values from the LSX tree.
+ * @param originalLsf - Original LSF as Buffer
+ * @param offsetMap - Offset table (from .offsets.json)
+ * @param lsxRoot - Parsed LSX tree
+ * @returns Patched LSF buffer
  */
 export function patchLsfValues(originalLsf: Buffer, offsetMap: OffsetMap, lsxRoot: LSFNode): Buffer {
 	const root = lsxRoot.name === "save" && lsxRoot.children.length === 1 ? lsxRoot.children[0] : lsxRoot;

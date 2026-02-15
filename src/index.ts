@@ -1,12 +1,12 @@
 /**
  * DOS2 Savegame Tools
  *
- * Ermöglicht das Entpacken von LSV-Savegame-Dateien (Divinity Original Sin 2)
- * und die Konvertierung zu LSX (XML-ähnliches Format).
+ * Unpack LSV savegame files (Divinity Original Sin 2)
+ * and convert to LSX (XML-like format).
  *
- * Der Prozess hat 2 Stufen:
- * 1. LSV entpacken → LSF/LSB Dateien (dieses Modul)
- * 2. LSF/LSB → LSX (mit Norbyte LSLib/Divine)
+ * Process has 2 stages:
+ * 1. Unpack LSV → LSF/LSB files (this module)
+ * 2. LSF/LSB → LSX (with Norbyte LSLib/Divine)
  *
  * @example
  * ```ts
@@ -33,3 +33,5 @@ export type { LsfVersion, WriteLsfOptions, LSFStringTable } from "./lsf/writer.j
 export { convertLsfToLsx } from "./lsx/lsx-writer.js";
 export { parseLsx } from "./lsx/lsx-reader.js";
 export type { LsxVersion, LsxOptions } from "./lsx/lsx-writer.js";
+export { patchLsfValues, patchLsfValue, patchLsfAtOffset, getLsfValue, getLsfValueAtOffset } from "./lsf/patch.js";
+export type { OffsetMap, AttributeOffsetInfo } from "./lsf/patch.js";

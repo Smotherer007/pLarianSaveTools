@@ -1,5 +1,5 @@
 /**
- * LSV Packer – packt Dateien zurück in ein LSV-Paket
+ * LSV Packer – packs files back into an LSV package
  * LSLib-kompatibel: FileEntry15 für v13, Padding 0xAD, CRC32, Manifest-Reihenfolge
  * DOS2 (v13)
  */
@@ -29,7 +29,7 @@ function writeU64(buf: Buffer, offset: number, val: number): void {
 	buf.writeBigUInt64LE(BigInt(val), offset);
 }
 
-/** CRC32 (IEEE) für LSLib v10–v16 Kompatibilität */
+/** CRC32 (IEEE) for LSLib v10–v16 compatibility */
 function crc32(buf: Buffer): number {
 	let crc = 0xffffffff;
 	const table = new Uint32Array(256);
@@ -51,7 +51,7 @@ function padNullTerminated(str: string, maxLen: number): Buffer {
 	return b;
 }
 
-/** LSLib: MD5 über unkomprimierte Dateiinhalte (alphabetisch), jeder Hash-Byte +1 */
+/** LSLib: MD5 over uncompressed file contents (alphabetical), each hash byte +1 */
 function computeArchiveHash(files: { name: string; raw: Buffer }[]): Buffer {
 	const sorted = [...files].sort((a, b) => a.name.localeCompare(b.name, "en"));
 	const hash = createHash("md5");
@@ -74,7 +74,7 @@ interface FileEntry {
 	crc?: number;
 }
 
-/** DOS2 LSV: Zlib für alle Dateien (wie Divine/LSLib) */
+/** DOS2 LSV: Zlib for all files (like Divine/LSLib) */
 const DEFAULT_LSV_FLAGS = 33; // Zlib + DefaultCompress
 
 interface ManifestFile {
@@ -88,7 +88,7 @@ interface ScanResult {
 	headerPriority?: number;
 }
 
-/** Verzeichnis scannen; nutzt __manifest__.json für Reihenfolge + Flags (LSLib-kompatibel) */
+/** Scan directory; uses __manifest__.json for order + flags (LSLib-compatible) */
 function scanDirectory(dir: string): ManifestFile[] {
 	return scanDirectoryWithManifest(dir).files;
 }
@@ -145,7 +145,7 @@ function scanDirectoryWithManifest(dir: string): ScanResult {
 	return { files: fileNames.sort().map((name) => ({ name, flags: DEFAULT_LSV_FLAGS })) };
 }
 
-/** FileEntry15 (304 B) – LSLib v13 Format mit CRC32. Unpacker liest archivePart/Flags von entrySize-12/entrySize-8. */
+/** FileEntry15 (304 B) – LSLib v13 format with CRC32. Unpacker reads archivePart/Flags from entrySize-12/entrySize-8. */
 function buildFileListV13(
 	files: FileEntry[],
 	offsets: number[],
@@ -188,13 +188,13 @@ function buildFileListDOS2(files: FileEntry[], offsets: number[], sizesOnDisk: n
 export interface PackLsvOptions {
 	/** LSV-Version: 13 (DOS2) */
 	version?: number;
-	/** Referenz-LSV: Unveränderte Dateien übernehmen Original-Bytes für byte-identischen Output */
+	/** Reference LSV: unchanged files use original bytes for byte-identical output */
 	reference?: string;
 }
 
 /**
- * Packt ein Verzeichnis (LSF-Dateien) zurück in eine LSV-Datei.
- * Scannt Verzeichnis, Zlib für alle (wie Divine).
+ * Pack a directory (LSF files) back into an LSV file.
+ * Scans directory, Zlib for all (like Divine).
  */
 export function packLsv(inputDir: string, outputPath: string, options?: PackLsvOptions): void {
 	const version = options?.version ?? 13;
@@ -270,8 +270,8 @@ export function packLsv(inputDir: string, outputPath: string, options?: PackLsvO
 }
 
 /**
- * Packt ein Verzeichnis mit LSX-Dateien (+ PNG etc.) zurück in eine LSV-Datei.
- * LSX → LSF konvertiert, andere Dateien unverändert. Scannt Verzeichnis (wie Divine).
+ * Pack a directory with LSX files (+ PNG etc.) back into an LSV file.
+ * Converts LSX → LSF, other files unchanged. Scans directory (like Divine).
  */
 export function packLsvFromLsx(inputDir: string, outputPath: string, options?: PackLsvOptions): void {
 	const version = options?.version ?? 13;
@@ -296,7 +296,7 @@ export function packLsvFromLsx(inputDir: string, outputPath: string, options?: P
 			const offsetsPath = lsxPath + ".offsets.json";
 			const baseLsfPath = lsxPath + ".base.lsf";
 			const origLsfPath = lsxPath.replace(/\.lsx$/i, ".lsf");
-			// Gepatchte .lsf bevorzugen (patch schreibt dorthin), sonst .base.lsf
+			// Prefer patched .lsf (patch writes there), else .base.lsf
 			const basePath = existsSync(origLsfPath) ? origLsfPath : (existsSync(baseLsfPath) ? baseLsfPath : null);
 			if (existsSync(offsetsPath) && basePath) {
 				const baseLsf = readFileSync(basePath);

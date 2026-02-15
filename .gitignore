@@ -10,7 +10,7 @@ extracted/
 tmp-verify/
 *.lsv.manifest.json
 
-# Savegame files (können groß sein)
+# Savegame files (can be large)
 *.lsv
 
 # OS
