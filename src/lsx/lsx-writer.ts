@@ -22,26 +22,31 @@ export function convertLsfToLsx(root: LSFNode, version?: LsxVersion, options?: L
 		...options
 	};
 
-	const BOM = "\uFEFF";
 	const EOL = "\r\n";
-	let xml = BOM + '<?xml version="1.0" encoding="utf-8"?>' + EOL;
-	xml += "<save>" + EOL;
-	xml += `\t<version major="${v.major}" minor="${v.minor}" revision="${v.revision}" build="${v.build}"`;
-	if (opts.lslibMeta) xml += ` lslib_meta="${opts.lslibMeta}"`;
-	xml += " />" + EOL;
+	const parts: string[] = [
+		"\uFEFF",
+		'<?xml version="1.0" encoding="utf-8"?>',
+		EOL,
+		"<save>",
+		EOL,
+		`\t<version major="${v.major}" minor="${v.minor}" revision="${v.revision}" build="${v.build}"`,
+		opts.lslibMeta ? ` lslib_meta="${opts.lslibMeta}"` : "",
+		" />",
+		EOL
+	];
 
 	// Mehrere Regionen (globals.lsf) oder einzelne Region (meta.lsf)
 	const regions = root.name === "save" && root.children.length > 0 ? root.children : [root];
 	for (const region of regions) {
-		xml += `\t<region id="${escapeXml(region.name)}">` + EOL;
-		xml += serializeNode(region, 2, opts, EOL);
-		xml += `\t</region>` + EOL;
+		parts.push(`\t<region id="${escapeXml(region.name)}">`, EOL);
+		serializeNodeToParts(region, 2, opts, EOL, parts);
+		parts.push("\t</region>", EOL);
 	}
-	xml += "</save>";
-	return xml;
+	parts.push("</save>");
+	return parts.join("");
 }
 
-function serializeNode(node: LSFNode, indent: number, opts: LsxOptions, eol: string = "\n"): string {
+function serializeNodeToParts(node: LSFNode, indent: number, opts: LsxOptions, eol: string, parts: string[]): void {
 	const tab = "\t";
 	const spacing = tab.repeat(indent);
 	const inner = tab.repeat(indent + 1);
@@ -51,25 +56,25 @@ function serializeNode(node: LSFNode, indent: number, opts: LsxOptions, eol: str
 
 	// LSLib: leere Nodes als selbstschließend <node id="X" />
 	if (!hasAttrs && !hasChildren) {
-		return `${spacing}<node id="${escapeXml(node.name)}"${keyAttr} />${eol}`;
+		parts.push(`${spacing}<node id="${escapeXml(node.name)}"${keyAttr} />`, eol);
+		return;
 	}
 
-	let xml = `${spacing}<node id="${escapeXml(node.name)}"${keyAttr}>${eol}`;
+	parts.push(`${spacing}<node id="${escapeXml(node.name)}"${keyAttr}>`, eol);
 
 	for (const [name, attr] of Object.entries(node.attributes)) {
-		xml += serializeAttribute(name, attr, inner, opts, eol);
+		parts.push(serializeAttribute(name, attr, inner, opts, eol));
 	}
 
 	if (hasChildren) {
-		xml += `${inner}<children>${eol}`;
+		parts.push(inner, "<children>", eol);
 		for (const child of node.children) {
-			xml += serializeNode(child, indent + 2, opts, eol);
+			serializeNodeToParts(child, indent + 2, opts, eol, parts);
 		}
-		xml += `${inner}</children>${eol}`;
+		parts.push(inner, "</children>", eol);
 	}
 
-	xml += `${spacing}</node>${eol}`;
-	return xml;
+	parts.push(`${spacing}</node>`, eol);
 }
 
 function serializeTranslatedFSStringArgs(args: NonNullable<TranslatedFSStringValue["arguments"]>, inner: string, eol: string): string {

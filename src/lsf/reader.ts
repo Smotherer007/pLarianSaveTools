@@ -80,6 +80,8 @@ export class LSFReader {
 	private nodes: LSFNodeEntry[] = [];
 	private attributes: LSFAttributeEntry[] = [];
 	private values!: Buffer;
+	/** parentIndex → child indices (O(1) lookup, built once after parseNodes) */
+	private childrenByParent!: Map<number, number[]>;
 
 	constructor(pathOrBuffer: string | Buffer) {
 		this.buffer = Buffer.isBuffer(pathOrBuffer) ? pathOrBuffer : readFileSync(pathOrBuffer);
@@ -423,19 +425,34 @@ export class LSFReader {
 		}
 	}
 
+	private buildChildrenMap(): void {
+		this.childrenByParent = new Map<number, number[]>();
+		for (let i = 0; i < this.nodes.length; i++) {
+			const parent = this.nodes[i].parentIndex;
+			let arr = this.childrenByParent.get(parent);
+			if (!arr) {
+				arr = [];
+				this.childrenByParent.set(parent, arr);
+			}
+			arr.push(i);
+		}
+	}
+
 	private reconstructTree(): LSFNode {
 		if (this.nodes.length === 0) throw new Error("No nodes found");
-		let rootIndices = this.nodes.map((n, i) => (n.parentIndex === -1 ? i : -1)).filter((i) => i >= 0);
+		this.buildChildrenMap();
+		let rootIndices = this.childrenByParent.get(-1) ?? [];
 		if (rootIndices.length === 0) throw new Error("No root node found");
 		if (this.meta.metadataFormat === 1 && rootIndices.length > 1) {
 			const referenced = new Set(rootIndices.map((i) => this.nodes[i].nextSiblingIndex).filter((s) => s >= 0));
 			const first = rootIndices.find((i) => !referenced.has(i)) ?? rootIndices[0];
-			rootIndices = [];
+			const ordered: number[] = [];
 			let cur: number = first;
 			while (cur >= 0) {
-				rootIndices.push(cur);
+				ordered.push(cur);
 				cur = this.nodes[cur].nextSiblingIndex;
 			}
+			rootIndices = ordered;
 		}
 		if (rootIndices.length === 1) {
 			return this.buildNodeRecursive(rootIndices[0], 0);
@@ -481,9 +498,7 @@ export class LSFReader {
 		}
 
 		// Kinder in LSF-Reihenfolge (nextSiblingIndex-Kette bei metadataFormat 1)
-		const childIndices = this.nodes
-			.map((n, i) => (n.parentIndex === nodeIdx && i !== nodeIdx ? i : -1))
-			.filter((i) => i >= 0);
+		const childIndices = this.childrenByParent.get(nodeIdx) ?? [];
 		if (childIndices.length > 0 && this.meta.metadataFormat === 1) {
 			// metadataFormat 1: nextSiblingIndex-Kette für korrekte Reihenfolge
 			const referenced = new Set(childIndices.map((i) => this.nodes[i].nextSiblingIndex).filter((s) => s >= 0));
@@ -517,7 +532,7 @@ export class LSFReader {
 	 */
 	public getAttributeOffsetMap(): Map<string, { offset: number; length: number; type: NodeAttributeType }> {
 		const result = new Map<string, { offset: number; length: number; type: NodeAttributeType }>();
-		const rootIndices = this.nodes.map((n, i) => (n.parentIndex === -1 ? i : -1)).filter((i) => i >= 0);
+		let rootIndices = this.childrenByParent.get(-1) ?? [];
 		let orderedRoots = rootIndices;
 		if (this.meta.metadataFormat === 1 && rootIndices.length > 1) {
 			const referenced = new Set(rootIndices.map((i) => this.nodes[i].nextSiblingIndex).filter((s) => s >= 0));
@@ -564,9 +579,7 @@ export class LSFReader {
 			attrIdx = attrEntry.nextAttributeIndex;
 		}
 
-		const childIndices = this.nodes
-			.map((n, i) => (n.parentIndex === nodeIdx && i !== nodeIdx ? i : -1))
-			.filter((i) => i >= 0);
+		const childIndices = this.childrenByParent.get(nodeIdx) ?? [];
 		let ordered: number[];
 		if (childIndices.length > 0 && this.meta.metadataFormat === 1) {
 			const referenced = new Set(childIndices.map((i) => this.nodes[i].nextSiblingIndex).filter((s) => s >= 0));
