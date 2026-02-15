@@ -104,19 +104,26 @@ function buildStringTable(stringsInOrder: string[]): { buffer: Buffer; indexMap:
 	return { buffer: buf.subarray(0, off), indexMap };
 }
 
-function flattenNodes(node: LSFNode, parentIdx: number, result: LSFNode[]): number {
+function flattenNodes(
+	node: LSFNode,
+	parentIdx: number,
+	result: LSFNode[],
+	nodeToIndex: Map<LSFNode, number>,
+	parentIndices: number[]
+): void {
 	const idx = result.length;
 	result.push(node);
+	nodeToIndex.set(node, idx);
+	parentIndices.push(parentIdx);
 	for (const child of node.children) {
-		flattenNodes(child, idx, result);
+		flattenNodes(child, idx, result, nodeToIndex, parentIndices);
 	}
-	return idx;
 }
 
 /** Pre-order: parent attributes before children (older LSF/V13). */
 function collectAttrsPreOrder(
 	node: LSFNode,
-	flatNodes: LSFNode[],
+	nodeToIndex: Map<LSFNode, number>,
 	nodeIdx: number,
 	pathPrefix: string,
 	out: { nodeIdx: number; name: string; attr: LSFAttribute; path: string }[]
@@ -131,15 +138,15 @@ function collectAttrsPreOrder(
 		const k = nameCounts.get(n) ?? 0;
 		nameCounts.set(n, k + 1);
 		const seg = k > 0 ? `${n}[${k}]` : n;
-		const childIdx = flatNodes.indexOf(c);
-		if (childIdx >= 0) collectAttrsPreOrder(c, flatNodes, childIdx, path + "/" + seg, out);
+		const childIdx = nodeToIndex.get(c) ?? -1;
+		if (childIdx >= 0) collectAttrsPreOrder(c, nodeToIndex, childIdx, path + "/" + seg, out);
 	}
 }
 
 /** LSLib: Attribute-Reihenfolge – Kinder vor Eltern, aber Eltern-Attribute vor dem letzten Kind (V14+). */
 function collectAttrsLslibOrder(
 	node: LSFNode,
-	flatNodes: LSFNode[],
+	nodeToIndex: Map<LSFNode, number>,
 	nodeIdx: number,
 	pathPrefix: string,
 	out: { nodeIdx: number; name: string; attr: LSFAttribute; path: string }[]
@@ -154,8 +161,8 @@ function collectAttrsLslibOrder(
 			const k = (nameCounts.get(n) ?? 0);
 			nameCounts.set(n, k + 1);
 			const seg = k > 0 ? `${n}[${k}]` : n;
-			const childIdx = flatNodes.indexOf(c);
-			if (childIdx >= 0) collectAttrsLslibOrder(c, flatNodes, childIdx, path + "/" + seg, out);
+			const childIdx = nodeToIndex.get(c) ?? -1;
+			if (childIdx >= 0) collectAttrsLslibOrder(c, nodeToIndex, childIdx, path + "/" + seg, out);
 		}
 		for (const [name, attr] of Object.entries(node.attributes)) {
 			out.push({ nodeIdx, name, attr, path: `${path}/${name}` });
@@ -165,8 +172,8 @@ function collectAttrsLslibOrder(
 		const k = nameCounts.get(n) ?? 0;
 		nameCounts.set(n, k + 1);
 		const seg = k > 0 ? `${n}[${k}]` : n;
-		const lastChildIdx = flatNodes.indexOf(last);
-		if (lastChildIdx >= 0) collectAttrsLslibOrder(last, flatNodes, lastChildIdx, path + "/" + seg, out);
+		const lastChildIdx = nodeToIndex.get(last) ?? -1;
+		if (lastChildIdx >= 0) collectAttrsLslibOrder(last, nodeToIndex, lastChildIdx, path + "/" + seg, out);
 	} else {
 		for (const [name, attr] of Object.entries(node.attributes)) {
 			out.push({ nodeIdx, name, attr, path: `${path}/${name}` });
@@ -407,12 +414,14 @@ export function writeLsf(root: LSFNode, outputPath: string, version?: LsfVersion
 	}
 
 	const flatNodes: LSFNode[] = [];
+	const nodeToIndex = new Map<LSFNode, number>();
+	const parentIndices: number[] = [];
 	if (root.name === "save" && root.children.length > 0) {
 		for (const region of root.children) {
-			flattenNodes(region, -1, flatNodes);
+			flattenNodes(region, -1, flatNodes, nodeToIndex, parentIndices);
 		}
 	} else {
-		flattenNodes(root, -1, flatNodes);
+		flattenNodes(root, -1, flatNodes, nodeToIndex, parentIndices);
 	}
 
 	const nodeEntries: { nameIndex: number; parentIndex: number; nextSiblingIndex: number; firstAttributeIndex: number }[] = [];
@@ -426,10 +435,8 @@ export function writeLsf(root: LSFNode, outputPath: string, version?: LsfVersion
 	const attrsPostOrder: { nodeIdx: number; name: string; attr: LSFAttribute; path: string }[] = [];
 	const collectAttrs = options?.attributeOrderPreOrder ? collectAttrsPreOrder : collectAttrsLslibOrder;
 	for (let i = 0; i < flatNodes.length; i++) {
-		const node = flatNodes[i];
-		const parentIdx = i > 0 ? flatNodes.findIndex((p) => p.children.includes(node)) : -1;
-		if (parentIdx < 0) {
-			collectAttrs(node, flatNodes, i, "", attrsPostOrder);
+		if (parentIndices[i] < 0) {
+			collectAttrs(flatNodes[i], nodeToIndex, i, "", attrsPostOrder);
 		}
 	}
 	let attrIdx = 0;
@@ -450,21 +457,14 @@ export function writeLsf(root: LSFNode, outputPath: string, version?: LsfVersion
 		const node = flatNodes[nodeIdx];
 		const firstAttrIdx = attrIdxByNode[nodeIdx].length > 0 ? attrIdxByNode[nodeIdx][0] : -1;
 
-		let parentIdx = -1;
-		for (let p = 0; p < nodeIdx; p++) {
-			if (flatNodes[p].children.includes(node)) {
-				parentIdx = p;
-				break;
-			}
-		}
+		const parentIdx = parentIndices[nodeIdx];
 		let nextSiblingIdx = -1;
 		if (parentIdx >= 0) {
 			const siblings = flatNodes[parentIdx].children;
 			const pos = siblings.indexOf(node);
 			if (pos >= 0 && pos < siblings.length - 1) {
 				const nextNode = siblings[pos + 1];
-				nextSiblingIdx = flatNodes.indexOf(nextNode);
-				if (nextSiblingIdx < 0) nextSiblingIdx = -1;
+				nextSiblingIdx = nodeToIndex.get(nextNode) ?? -1;
 			}
 		}
 

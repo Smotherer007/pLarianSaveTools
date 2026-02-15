@@ -40,111 +40,46 @@ Use `extract-lsx` to unpack an LSV file and convert all LSF files to LSX in one 
 node dist/cli.js extract-lsx Kiss.lsv ./lsx-only
 ```
 
-### Patch workflow (edit individual files)
+### Edit workflow
 
-To edit specific files (e.g. only `meta` for Difficulty) without full re-serialization:
-
-1. **Unpack** – Extract LSV (LSF files)
+1. **Extract** – Unpack LSV and convert LSF to LSX in one step
    ```bash
-   node dist/cli.js unpack Kiss.lsv ./extracted
+   node dist/cli.js extract-lsx Kiss.lsv ./lsx-only
    ```
 
-2. **Convert** – Convert only the file to edit to LSX (creates `.offsets.json` for patching)
+2. **Edit** – Open LSX files in a text editor (e.g. `meta.lsx` for Difficulty, player name)
+
+3. **Pack** – Convert LSX back to LSF and repack
    ```bash
-   node dist/cli.js convert ./extracted/meta.lsf ./extracted/meta.lsx
+   node dist/cli.js pack-lsx ./lsx-only Kiss_repacked.lsv
    ```
 
-3. **Edit** – Open `meta.lsx` in a text editor and modify (e.g. Difficulty, player name)
-
-4. **Pack** – Repack the folder (uses patch: only changed values are injected)
+4. **Optional: Cleanup** – Remove LSX files after packing
    ```bash
-   node dist/cli.js pack-lsx ./extracted Kiss_repacked.lsv
+   node dist/cli.js pack-lsx ./lsx-only Kiss_repacked.lsv --cleanup
    ```
-
-5. **Optional: Cleanup** – Remove LSX and offsets after packing
-   ```bash
-   node dist/cli.js pack-lsx ./extracted Kiss_repacked.lsv --cleanup
-   ```
-
-**Alternative: Patch LSF only (without repacking LSV)** – Apply LSX changes directly to LSF:
-```bash
-node dist/cli.js patch ./extracted/meta.lsx --cleanup
-# or all LSX in folder:
-node dist/cli.js patch ./extracted --cleanup
-```
 
 ### Repack a savegame
 
 **Pack (LSF files):** Scans the directory and packs all files with Zlib (like [Divine](https://github.com/fireundubh/divine)).
 
-**Pack-LSX (LSX files):** Scans the directory, converts LSX→LSF and packs everything. With `.offsets.json` present, a patch is applied (minimal changes).
+**Pack-LSX (LSX files):** Scans the directory, converts LSX→LSF and packs everything.
 
 ### Convert LSF to LSX (for editing)
 
-LSF files are binary and hard to read. After converting to LSX you can edit them with a text editor. LSF→LSX also creates `.offsets.json` (for the patch workflow).
-
-### Quick patch test
-
-To quickly test LSX changes in-game (without full pack-lsx each time):
-
-```bash
-# One-time: extract LSV
-node dist/cli.js extract-lsx QuickSave_14.lsv ./extracted
-
-# Edit meta.lsx, then:
-npm run test:patch -- --dir ./extracted
-# → creates QuickSave_14_patch_test.lsv (patch + pack only, very fast)
-```
-
-Or run everything at once: `npm run test:patch` (with QuickSave_14.lsv in project folder).
+LSF files are binary and hard to read. After converting to LSX you can edit them with a text editor.
 
 ### Command reference
 
-| Action                            | Command                                                              |
-| --------------------------------- | -------------------------------------------------------------------- |
-| Unpack                            | `node dist/cli.js unpack file.lsv target-folder`                     |
-| **LSV → LSX (+ PNG etc.)**        | `node dist/cli.js extract-lsx file.lsv target-folder`               |
-| Repack (LSX)                      | `node dist/cli.js pack-lsx source-folder output.lsv`                  |
-| Repack (LSX) + cleanup           | `node dist/cli.js pack-lsx source-folder output.lsv --cleanup`       |
-| Repack (LSF)                      | `node dist/cli.js pack source-folder output.lsv`                      |
-| **LSX → LSF patch**               | `node dist/cli.js patch file.lsx [--cleanup]`                         |
-| **LSX → LSF patch (folder)**     | `node dist/cli.js patch folder [--cleanup]`                           |
-| **Patch single value**           | `node dist/cli.js patch-value file.lsf <path> <value>`               |
-| **Read value**                   | `node dist/cli.js get-value file.lsf <path>`                         |
-| LSF → LSX                         | `node dist/cli.js convert file.lsf file.lsx`                          |
-| **Offsets only**                 | `node dist/cli.js convert file.lsf --offsets-only`                  |
-| LSX → LSF                         | `node dist/cli.js convert file.lsx file.lsf`                         |
-
-### Read/patch single value (for API/frontend)
-
-Without parsing LSX – use path directly. Paths from `.offsets.json`:
-
-```bash
-# Create offsets only (fast, no LSX)
-node dist/cli.js convert meta.lsf --offsets-only
-
-# Read value
-node dist/cli.js get-value meta.lsf MetaData/MetaData/Difficulty
-
-# Patch value
-node dist/cli.js patch-value meta.lsf MetaData/MetaData/Difficulty 2
-```
-
-Programmatic usage:
-
-```ts
-import { getLsfValue, getLsfValueAtOffset, patchLsfValue, patchLsfAtOffset } from "dos2-savegame-tools";
-
-// Read value
-const value = getLsfValue(lsfBuffer, offsetMap, "MetaData/MetaData/Difficulty");
-
-// Patch value
-const patched = patchLsfValue(lsfBuffer, offsetMap, "MetaData/MetaData/Difficulty", 2);
-
-// With raw offset (when offset/length/type known)
-const value = getLsfValueAtOffset(lsfBuffer, offset, length, type);
-const patched = patchLsfAtOffset(lsfBuffer, offset, length, type, value);
-```
+| Action                     | Command                                              |
+| -------------------------- | ---------------------------------------------------- |
+| Unpack                     | `node dist/cli.js unpack file.lsv target-folder`     |
+| **LSV → LSX (+ PNG etc.)** | `node dist/cli.js extract-lsx file.lsv target-folder` |
+| Repack (LSX)               | `node dist/cli.js pack-lsx source-folder output.lsv` |
+| Repack (LSX) + cleanup      | `node dist/cli.js pack-lsx source-folder output.lsv --cleanup` |
+| Repack (LSF)               | `node dist/cli.js pack source-folder output.lsv`     |
+| LSF → LSX                  | `node dist/cli.js convert file.lsf file.lsx`         |
+| LSX → LSF                  | `node dist/cli.js convert file.lsx file.lsf`         |
 
 ### Help
 

@@ -11,7 +11,6 @@ import { compress } from "./compression.js";
 import { LSPK_SIGNATURE } from "./types.js";
 import { parseLsx } from "../lsx/lsx-reader.js";
 import { writeLsfToBuffer } from "../lsf/writer.js";
-import { patchLsfValues } from "../lsf/patch.js";
 
 const FILE_ENTRY_10_SIZE = 280;
 const FILE_ENTRY_15_SIZE = 304; // LSLib: Name(256)+Offset(8)+SizeDisk(8)+Uncomp(8)+Part(4)+Flags(4)+Crc(4)+Unknown2(4)
@@ -293,23 +292,9 @@ export function packLsvFromLsx(inputDir: string, outputPath: string, options?: P
 		const lsxPath = rel.toLowerCase().endsWith(".lsx") ? filePath : filePath.replace(/\.lsf$/i, ".lsx");
 		const isLsxInput = rel.toLowerCase().endsWith(".lsx") || (rel.toLowerCase().endsWith(".lsf") && existsSync(lsxPath));
 		if (isLsxInput) {
-			const offsetsPath = lsxPath + ".offsets.json";
-			const baseLsfPath = lsxPath + ".base.lsf";
-			const origLsfPath = lsxPath.replace(/\.lsx$/i, ".lsf");
-			// Prefer patched .lsf (patch writes there), else .base.lsf
-			const basePath = existsSync(origLsfPath) ? origLsfPath : (existsSync(baseLsfPath) ? baseLsfPath : null);
-			if (existsSync(offsetsPath) && basePath) {
-				const baseLsf = readFileSync(basePath);
-				const offsetMap = JSON.parse(readFileSync(offsetsPath, "utf8")) as {
-					attributes: Record<string, { offset: number; length: number; type: number }>;
-				};
-				const { root } = parseLsx(lsxPath);
-				raw = patchLsfValues(baseLsf, offsetMap, root);
-			} else {
-				const { root, version: lsxVersion } = parseLsx(lsxPath);
-				const lsxOpts = lsxVersion.major >= 4 ? undefined : { metadataFormat: 0 };
-				raw = writeLsfToBuffer(root, lsxVersion, lsxOpts);
-			}
+			const { root, version: lsxVersion } = parseLsx(lsxPath);
+			const lsxOpts = lsxVersion.major >= 4 ? undefined : { metadataFormat: 0 };
+			raw = writeLsfToBuffer(root, lsxVersion, lsxOpts);
 			packageName = rel.toLowerCase().endsWith(".lsx") ? rel.replace(/\.lsx$/i, ".lsf") : rel;
 		} else {
 			raw = readFileSync(filePath);

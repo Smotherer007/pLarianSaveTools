@@ -23,12 +23,9 @@
 		"verify:quick": "node dist/scripts/verify-roundtrip.js --quick",
 		"verify:lsf2lsx": "node dist/scripts/verify-roundtrip.js --lsf2lsx",
 		"verify:unpack": "node dist/scripts/verify-roundtrip.js --unpack",
-		"test:meta-patch": "node dist/scripts/test-meta-patch.js",
-		"test:patch": "node dist/scripts/quick-patch-test.js",
 		"convert-stepwise": "node dist/scripts/convert-lsf-stepwise.js",
 		"extract": "node dist/cli.js extract-lsx",
 		"pack": "node dist/cli.js pack-lsx",
-		"patch": "node dist/cli.js patch",
 		"verify:lsx-roundtrip": "node dist/scripts/verify-lsx-roundtrip.js"
 	},
 	"keywords": [

@@ -33,5 +33,3 @@ export type { LsfVersion, WriteLsfOptions, LSFStringTable } from "./lsf/writer.j
 export { convertLsfToLsx } from "./lsx/lsx-writer.js";
 export { parseLsx } from "./lsx/lsx-reader.js";
 export type { LsxVersion, LsxOptions } from "./lsx/lsx-writer.js";
-export { patchLsfValues, patchLsfValue, patchLsfAtOffset, getLsfValue, getLsfValueAtOffset } from "./lsf/patch.js";
-export type { OffsetMap, AttributeOffsetInfo } from "./lsf/patch.js";

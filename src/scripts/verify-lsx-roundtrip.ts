@@ -51,14 +51,6 @@ function extractLsxFromLsv(inputLsv: string, outputDir: string): void {
 		const lsx = convertLsfToLsx(root, reader.getEngineVersion());
 		writeFileSync(lsxPath, lsx, "utf8");
 
-		const offsetMap = reader.getAttributeOffsetMap();
-		const offsetsJson: Record<string, { offset: number; length: number; type: number }> = {};
-		for (const [path, info] of offsetMap) {
-			offsetsJson[path] = { offset: info.offset, length: info.length, type: info.type };
-		}
-		writeFileSync(lsxPath + ".offsets.json", JSON.stringify({ attributes: offsetsJson }, null, 0), "utf8");
-		writeFileSync(lsxPath + ".base.lsf", content);
-
 		manifestFiles.push({ name: toLsxPath(file.name), flags: file.flags ?? 33 });
 	}
 
@@ -93,7 +85,7 @@ function main() {
 	console.log(`Original: ${inputLsv}\n`);
 
 	// 1. Extract
-	console.log("1. extract-lsx (LSV → LSX + offsets + base)...");
+	console.log("1. extract-lsx (LSV → LSX)...");
 	extractLsxFromLsv(inputLsv, extractDir);
 	console.log("   Fertig.\n");
 

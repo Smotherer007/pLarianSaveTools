@@ -93,15 +93,6 @@ function main() {
 		const lsx = convertLsfToLsx(root, reader.getEngineVersion());
 		writeFileSync(lsxPath, lsx, "utf8");
 
-		// Offsets + Base für Patch
-		const offsetMap = reader.getAttributeOffsetMap();
-		const offsetsJson: Record<string, { offset: number; length: number; type: number }> = {};
-		for (const [path, info] of offsetMap) {
-			offsetsJson[path] = { offset: info.offset, length: info.length, type: info.type };
-		}
-		writeFileSync(lsxPath + ".offsets.json", JSON.stringify({ attributes: offsetsJson }, null, 0), "utf8");
-		writeFileSync(lsxPath + ".base.lsf", content);
-
 		manifestFiles.push({ name: lsxName, flags });
 	}
 
