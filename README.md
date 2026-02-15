@@ -1,8 +1,6 @@
-# DOS2 & BG3 Savegame Tools
+# DOS2 Savegame Tools
 
-A tool to unpack, edit, and repack savegame files from **Divinity Original Sin 2** and **Baldur's Gate 3**.
-
-> **⚠️ Disclaimer:** DOS2 does **not** accept manipulated savegames at this time. After unpacking, editing, and repacking, the game will not load the saves. This tool is not yet functional for DOS2. BG3 has not been tested.
+A tool to unpack, edit, and repack savegame files from **Divinity Original Sin 2**.
 
 ## What can you do with it?
 
@@ -30,29 +28,89 @@ All commands are run in the terminal. Each command starts with `node dist/cli.js
 
 Create a target folder and unpack the LSV file into it.
 
+```bash
+node dist/cli.js unpack Kiss.lsv ./extracted
+```
+
 ### Extract LSV directly to LSX
 
 Use `extract-lsx` to unpack an LSV file and convert all LSF files to LSX in one step. The output folder will contain only LSX files (no LSF files).
+
+```bash
+node dist/cli.js extract-lsx Kiss.lsv ./lsx-only
+```
+
+### Patch-Workflow (einzelne Dateien bearbeiten)
+
+Zum gezielten Bearbeiten einzelner Dateien (z.B. nur `meta` für Difficulty) ohne vollständige Re-Serialisierung:
+
+1. **Unpack** – LSV entpacken (LSF-Dateien)
+   ```bash
+   node dist/cli.js unpack Kiss.lsv ./extracted
+   ```
+
+2. **Convert** – nur die zu bearbeitende Datei zu LSX konvertieren (erzeugt `.offsets.json` für den Patch)
+   ```bash
+   node dist/cli.js convert ./extracted/meta.lsf ./extracted/meta.lsx
+   ```
+
+3. **Bearbeiten** – `meta.lsx` im Texteditor öffnen und ändern (z.B. Difficulty, Spielername)
+
+4. **Pack** – Ordner zurück packen (nutzt Patch: nur geänderte Werte werden injiziert)
+   ```bash
+   node dist/cli.js pack-lsx ./extracted Kiss_repacked.lsv
+   ```
+
+5. **Optional: Aufräumen** – LSX und Offsets nach dem Packen löschen
+   ```bash
+   node dist/cli.js pack-lsx ./extracted Kiss_repacked.lsv --cleanup
+   ```
+
+**Alternative: Nur LSF patchen (ohne LSV neu zu packen)** – Änderungen aus LSX direkt in die LSF überführen:
+```bash
+node dist/cli.js patch ./extracted/meta.lsx --cleanup
+# oder alle LSX im Ordner:
+node dist/cli.js patch ./extracted --cleanup
+```
 
 ### Repack a savegame
 
 **Pack (LSF-Dateien):** Scannt das Verzeichnis und packt alle Dateien mit Zlib (wie [Divine](https://github.com/fireundubh/divine)).
 
-**Pack-LSX (LSX-Dateien):** Scannt das Verzeichnis, konvertiert LSX→LSF und packt alles.
+**Pack-LSX (LSX-Dateien):** Scannt das Verzeichnis, konvertiert LSX→LSF und packt alles. Bei vorhandenen `.offsets.json` wird ein Patch durchgeführt (minimale Änderungen).
 
 ### Convert LSF to LSX (for editing)
 
-LSF files are binary and hard to read. After converting to LSX you can edit them with a text editor. You can then convert them back to LSF.
+LSF files are binary and hard to read. After converting to LSX you can edit them with a text editor. Bei LSF→LSX werden zusätzlich `.offsets.json` erzeugt (für den Patch-Workflow).
+
+### Schneller Patch-Test
+
+Zum schnellen Testen von LSX-Änderungen im Spiel (ohne jedes Mal volles pack-lsx):
+
+```bash
+# Einmalig: LSV extrahieren
+node dist/cli.js extract-lsx QuickSave_14.lsv ./extracted
+
+# meta.lsx bearbeiten, dann:
+npm run test:patch -- --dir ./extracted
+# → erzeugt QuickSave_14_patch_test.lsv (nur patch + pack, sehr schnell)
+```
+
+Oder alles in einem Durchlauf: `npm run test:patch` (mit QuickSave_14.lsv im Projektordner).
 
 ### Command reference
 
-| Action                            | Command                                                     |
-| --------------------------------- | ----------------------------------------------------------- |
-| Unpack                            | `node dist/cli.js unpack file.lsv target-folder`            |
-| **LSV → LSX (+ PNG etc.)**        | `node dist/cli.js extract-lsx file.lsv target-folder`      |
-| Repack                            | `node dist/cli.js pack source-folder output.lsv`            |
-| LSF → LSX                         | `node dist/cli.js convert file.lsf file.lsx`                |
-| LSX → LSF                         | `node dist/cli.js convert file.lsx file.lsf`                |
+| Action                            | Command                                                              |
+| --------------------------------- | -------------------------------------------------------------------- |
+| Unpack                            | `node dist/cli.js unpack file.lsv target-folder`                     |
+| **LSV → LSX (+ PNG etc.)**        | `node dist/cli.js extract-lsx file.lsv target-folder`               |
+| Repack (LSX)                      | `node dist/cli.js pack-lsx source-folder output.lsv`                  |
+| Repack (LSX) + Aufräumen         | `node dist/cli.js pack-lsx source-folder output.lsv --cleanup`       |
+| Repack (LSF)                      | `node dist/cli.js pack source-folder output.lsv`                      |
+| **LSX → LSF patchen**             | `node dist/cli.js patch file.lsx [--cleanup]`                         |
+| **LSX → LSF patchen (Ordner)**    | `node dist/cli.js patch folder [--cleanup]`                           |
+| LSF → LSX                         | `node dist/cli.js convert file.lsf file.lsx`                          |
+| LSX → LSF                         | `node dist/cli.js convert file.lsx file.lsf`                         |
 
 ### Help
 
@@ -60,8 +118,7 @@ Use `help` or `--help` to see an overview of all commands.
 
 ## Supported games
 
-- **Divinity Original Sin 2** (DOS2) – ⚠️ manipulated saves are not accepted by the game
-- **Baldur's Gate 3** (BG3) – not tested
+- **Divinity Original Sin 2** (DOS2)
 
 ## License
 

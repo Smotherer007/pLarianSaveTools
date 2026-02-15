@@ -29,7 +29,7 @@ export type { PackagedFileInfo } from "./lsv/types.js";
 export { decompress, decompressLZ4, decompressZlib } from "./lsv/compression.js";
 export { LSFReader } from "./lsf/reader.js";
 export { writeLsf, writeLsfToBuffer } from "./lsf/writer.js";
-export type { LsfVersion, WriteLsfOptions } from "./lsf/writer.js";
+export type { LsfVersion, WriteLsfOptions, LSFStringTable } from "./lsf/writer.js";
 export { convertLsfToLsx } from "./lsx/lsx-writer.js";
 export { parseLsx } from "./lsx/lsx-reader.js";
 export type { LsxVersion, LsxOptions } from "./lsx/lsx-writer.js";

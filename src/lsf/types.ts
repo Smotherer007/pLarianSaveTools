@@ -56,7 +56,7 @@ export interface LSFMetadataBlock {
 	nodes: LSFMetadata;
 	attributes: LSFMetadata;
 	values: LSFMetadata;
-	keys?: LSFMetadata; // BG3 v6+ (KeysAndAdjacency)
+	keys?: LSFMetadata; // LSF v6+ (KeysAndAdjacency)
 	compressionFlags: number;
 	metadataFormat: number;
 }
@@ -79,7 +79,7 @@ export interface LSFAttributeEntry {
 
 export interface LSFNode {
 	name: string;
-	/** UUID für eindeutige Node-Referenz (BG3, LSX key-Attribut) */
+	/** UUID für eindeutige Node-Referenz (LSX key-Attribut) */
 	key?: string;
 	attributes: Record<string, LSFAttribute>;
 	children: LSFNode[];

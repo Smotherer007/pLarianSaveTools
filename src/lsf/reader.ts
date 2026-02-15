@@ -7,7 +7,7 @@ const require = createRequire(import.meta.url);
 const lz4 = require("lz4");
 
 /** LZ4 Frame manuell dekodieren – unterstützt abhängige Blöcke (blockIndependence=0) für LSF */
-function decompressLZ4Frame(raw: Buffer): Buffer {
+export function decompressLZ4Frame(raw: Buffer): Buffer {
 	const LZ4_MAGIC = 0x184d2204;
 	const blockMaxSizes = [0, 0, 0, 0, 64 << 10, 256 << 10, 1 << 20, 4 << 20];
 	const EOS = 0;
@@ -92,6 +92,11 @@ export class LSFReader {
 		return this.reconstructTree();
 	}
 
+	/** Unkomprimierter Values-Block (für Debug/Roundtrip). */
+	public getValuesBuffer(): Buffer {
+		return this.values;
+	}
+
 	/** Engine-Version aus dem LSF-Header. */
 	public getEngineVersion(): { major: number; minor: number; revision: number; build: number } {
 		const v = this.header.engineVersion;
@@ -119,7 +124,7 @@ export class LSFReader {
 			throw new Error(`Invalid LSF magic: ${magic}`);
 		}
 		const version = this.buffer.readUInt32LE(4);
-		// BG3 v5+ (VerBG3ExtendedHeader): Int64 EngineVersion
+		// LSF v5+: Int64 EngineVersion
 		const engineVersion = version >= 5 ? this.buffer.readBigUInt64LE(8) : BigInt(this.buffer.readUInt32LE(8) >>> 0);
 		this.header = { magic, version, engineVersion };
 		this.offset = version >= 5 ? 16 : 12; // 8+8 vs 8+4
@@ -127,7 +132,7 @@ export class LSFReader {
 
 	private readMetadata() {
 		const o = this.offset;
-		// BG3 v6+ (VerBG3NodeKeys): LSFMetadataV6 mit Keys-Block
+		// LSF v6+: LSFMetadataV6 mit Keys-Block
 		if (this.header.version >= 6) {
 			this.meta = {
 				strings: {
@@ -186,7 +191,7 @@ export class LSFReader {
 		const stringBuf = this.decompressBlock(strings, false); // allowChunked=false für Strings
 		this.parseStringTable(stringBuf);
 
-		// BG3 v6+: Block-Reihenfolge auf Disk ist strings, nodes, keys, attrs, values
+		// LSF v6+: Block-Reihenfolge auf Disk ist strings, nodes, keys, attrs, values
 		// Keys+Attrs können als ein LZ4-Frame zusammengefasst sein
 		if (this.header.version >= 6) {
 			const nodeBuf = this.decompressBlock(nodes, true);
@@ -258,7 +263,7 @@ export class LSFReader {
 			const out = Buffer.alloc(Math.max(uncompressedSize, raw.length * 10));
 			let decoded = lz4.decodeBlock(raw, out);
 			if (decoded < 0) {
-				// Fallback: LZ4-Frame ohne Magic am Anfang oder Zstd (BG3/DOS2-Varianten)
+				// Fallback: LZ4-Frame ohne Magic am Anfang oder Zstd
 				try {
 					const dec = lz4.decode(raw);
 					const buf = Buffer.isBuffer(dec) ? dec : Buffer.from(dec);
@@ -273,7 +278,7 @@ export class LSFReader {
 				} catch {
 					// ignore
 				}
-				// BG3 LevelCache: Values-Block kann anderes Format haben – Rohdaten mit Null-Padding als Fallback
+				// LSF v5+ LevelCache: Values-Block kann anderes Format haben – Rohdaten mit Null-Padding als Fallback
 				if (isValues && sizeOnDisk <= uncompressedSize) {
 					const result = Buffer.alloc(uncompressedSize, 0);
 					raw.copy(result, 0, 0, Math.min(sizeOnDisk, uncompressedSize));
@@ -320,6 +325,40 @@ export class LSFReader {
 			return this.strings[bucket][offset];
 		}
 		return `undefined_0x${nameHashTableIndex.toString(16)}`;
+	}
+
+	/** Original-String-Tabelle für byte-identischen Roundtrip (LSF→LSX→LSF mit nur Wertänderungen). */
+	public getStringTable(): { buffer: Buffer; indexMap: Map<string, number> } {
+		const indexMap = new Map<string, number>();
+		for (let bucket = 0; bucket < this.strings.length; bucket++) {
+			const chain = this.strings[bucket];
+			for (let offset = 0; offset < chain.length; offset++) {
+				indexMap.set(chain[offset], (bucket << 16) | offset);
+			}
+		}
+		let bufSize = 4;
+		for (const chain of this.strings) {
+			bufSize += 2;
+			for (const s of chain) {
+				bufSize += 2 + Buffer.byteLength(s, "utf8");
+			}
+		}
+		const buf = Buffer.alloc(bufSize);
+		let off = 0;
+		buf.writeUInt32LE(this.strings.length, off);
+		off += 4;
+		for (const chain of this.strings) {
+			buf.writeUInt16LE(chain.length, off);
+			off += 2;
+			for (const s of chain) {
+				const enc = Buffer.from(s, "utf8");
+				buf.writeUInt16LE(enc.length, off);
+				off += 2;
+				enc.copy(buf, off);
+				off += enc.length;
+			}
+		}
+		return { buffer: buf, indexMap };
 	}
 
 	private parseNodes(buffer: Buffer) {
@@ -460,27 +499,97 @@ export class LSFReader {
 				node.children.push(this.buildNodeRecursive(i, depth + 1));
 			}
 		} else {
-			// metadataFormat 0: LSLib Node.Children = Dictionary<Name, List<Node>>, LSXWriter iteriert gruppiert nach Name
+			// metadataFormat 0: LSLib ReadRegions iteriert Nodes in Datei-Reihenfolge (i=0..N),
+			// AppendChild fügt in dieser Reihenfolge hinzu → Children-Reihenfolge = LSF-Datei-Reihenfolge
 			childIndices.sort((a, b) => a - b);
-			const namesInOrder: string[] = [];
-			for (const i of childIndices) {
-				const name = this.resolveName(this.nodes[i].nameIndex);
-				if (!namesInOrder.includes(name)) namesInOrder.push(name);
-			}
-			childIndices.sort((a, b) => {
-				const nameA = this.resolveName(this.nodes[a].nameIndex);
-				const nameB = this.resolveName(this.nodes[b].nameIndex);
-				const posA = namesInOrder.indexOf(nameA);
-				const posB = namesInOrder.indexOf(nameB);
-				if (posA !== posB) return posA - posB;
-				return a - b;
-			});
 			for (const i of childIndices) {
 				node.children.push(this.buildNodeRecursive(i, depth + 1));
 			}
 		}
 
 		return node;
+	}
+
+	/**
+	 * Liefert eine Map von Attribut-Pfaden zu { offset, length, type } im Values-Buffer.
+	 * Pfad-Format: "Region/Node/Node[1]/AttrName" (Index bei mehrfachen Geschwistern gleichen Namens).
+	 * Muss nach read() aufgerufen werden.
+	 */
+	public getAttributeOffsetMap(): Map<string, { offset: number; length: number; type: NodeAttributeType }> {
+		const result = new Map<string, { offset: number; length: number; type: NodeAttributeType }>();
+		const rootIndices = this.nodes.map((n, i) => (n.parentIndex === -1 ? i : -1)).filter((i) => i >= 0);
+		let orderedRoots = rootIndices;
+		if (this.meta.metadataFormat === 1 && rootIndices.length > 1) {
+			const referenced = new Set(rootIndices.map((i) => this.nodes[i].nextSiblingIndex).filter((s) => s >= 0));
+			const first = rootIndices.find((i) => !referenced.has(i)) ?? rootIndices[0];
+			orderedRoots = [];
+			let cur: number = first;
+			while (cur >= 0) {
+				orderedRoots.push(cur);
+				cur = this.nodes[cur].nextSiblingIndex;
+			}
+		}
+		const pathPrefix = orderedRoots.length === 1 ? "" : "save";
+		for (let i = 0; i < orderedRoots.length; i++) {
+			const idx = orderedRoots[i];
+			const seg = orderedRoots.length === 1 ? this.resolveName(this.nodes[idx].nameIndex) : `region[${i}]`;
+			this.buildOffsetMapRecursive(idx, pathPrefix ? `${pathPrefix}/${seg}` : seg, result);
+		}
+		return result;
+	}
+
+	private buildOffsetMapRecursive(
+		nodeIdx: number,
+		pathPrefix: string,
+		result: Map<string, { offset: number; length: number; type: NodeAttributeType }>
+	): void {
+		const nodeEntry = this.nodes[nodeIdx];
+		const nodeName = this.resolveName(nodeEntry.nameIndex);
+
+		let attrIdx = nodeEntry.firstAttributeIndex;
+		let runningOffset = 0;
+		const visitedAttrs = new Set<number>();
+		while (attrIdx !== -1 && attrIdx < this.attributes.length) {
+			if (visitedAttrs.has(attrIdx)) break;
+			visitedAttrs.add(attrIdx);
+			const attrEntry = this.attributes[attrIdx];
+			const attrName = this.resolveName(attrEntry.nameIndex);
+			const actualOffset = attrEntry.offset ?? runningOffset;
+			result.set(`${pathPrefix}/${attrName}`, {
+				offset: actualOffset,
+				length: attrEntry.length,
+				type: attrEntry.type
+			});
+			runningOffset = actualOffset + attrEntry.length;
+			attrIdx = attrEntry.nextAttributeIndex;
+		}
+
+		const childIndices = this.nodes
+			.map((n, i) => (n.parentIndex === nodeIdx && i !== nodeIdx ? i : -1))
+			.filter((i) => i >= 0);
+		let ordered: number[];
+		if (childIndices.length > 0 && this.meta.metadataFormat === 1) {
+			const referenced = new Set(childIndices.map((i) => this.nodes[i].nextSiblingIndex).filter((s) => s >= 0));
+			const first = childIndices.find((i) => !referenced.has(i)) ?? childIndices[0];
+			ordered = [];
+			let cur: number = first;
+			while (cur >= 0) {
+				ordered.push(cur);
+				cur = this.nodes[cur].nextSiblingIndex;
+			}
+		} else {
+			childIndices.sort((a, b) => a - b);
+			ordered = childIndices;
+		}
+
+		const nameCounts = new Map<string, number>();
+		for (const i of ordered) {
+			const name = this.resolveName(this.nodes[i].nameIndex);
+			const count = nameCounts.get(name) ?? 0;
+			nameCounts.set(name, count + 1);
+			const seg = count > 0 ? `${name}[${count}]` : name;
+			this.buildOffsetMapRecursive(i, `${pathPrefix}/${seg}`, result);
+		}
 	}
 
 	/** LSF-Format: length bytes, letztes Byte = Null-Terminator */
@@ -510,7 +619,7 @@ export class LSFReader {
 		].join("-");
 	}
 
-	/** DOS2: valueLength, value, handleLength, handle. BG3: +Version (2B) am Anfang */
+	/** LSF v3: valueLength, value, handleLength, handle. LSF v5+: +Version (2B) am Anfang */
 	private readTranslatedString(buf: Buffer): { value: string; handle: string } {
 		let pos = 0;
 		if (buf.length < 8) return { value: "", handle: "" };
@@ -534,11 +643,11 @@ export class LSFReader {
 	/** LSF-Format: value/handle wie TranslatedString, dann arguments mit key, String (rekursiv), value. Gibt auch bytesConsumed zurück. */
 	private readTranslatedFSStringWithLength(buf: Buffer): { result: TranslatedFSStringValue; bytesConsumed: number } {
 		let pos = 0;
-		const isBG3 = this.header.version >= 5;
+		const isLsfV5 = this.header.version >= 5;
 		let value = "";
 
 		if (buf.length < 4) return { result: { value: "", handle: "" }, bytesConsumed: 0 };
-		if (isBG3) {
+		if (isLsfV5) {
 			if (buf.length < 6) return { result: { value: "", handle: "" }, bytesConsumed: 0 };
 			pos += 2; // Version
 		} else {

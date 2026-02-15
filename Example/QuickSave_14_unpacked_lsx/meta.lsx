@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <save>
 	<version major="3" minor="6" revision="9" build="0" lslib_meta="v1,bswap_guids" />
 	<region id="MetaData">
@@ -21,7 +21,7 @@
 					<attribute id="GMCampaignId" type="22" value="" />
 					<attribute id="GMCampaignName" type="30" value="" />
 					<attribute id="SaveGameType" type="1" value="1" />
-					<attribute id="Difficulty" type="1" value="2" />
+					<attribute id="Difficulty" type="1" value="1" />
 					<children>
 						<node id="ModuleSettings">
 							<children>

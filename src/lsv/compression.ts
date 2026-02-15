@@ -1,6 +1,6 @@
 /**
  * Compression/decompression for LSV package format
- * Supports Zlib, LZ4 (DOS2) und Zstd (BG3)
+ * Supports Zlib, LZ4 (DOS2)
  */
 
 import { inflateSync, deflateSync } from "node:zlib";
@@ -38,7 +38,7 @@ export function decompress(compressed: Buffer, decompressedSize: number, flags: 
 			return decompressZlib(compressed);
 		case 2: // LZ4
 			return decompressLZ4(compressed, decompressedSize);
-		case 3: // Zstd (BG3)
+		case 3: // Zstd
 			return decompressZstdBuffer(compressed);
 		default:
 			throw new Error(`Unknown compression method: ${method}`);
@@ -53,8 +53,9 @@ export function compressLZ4(data: Buffer): Buffer {
 	return out.subarray(0, written);
 }
 
+/** Zlib mit Default-Level (78 9c) – wie DOS2/LSLib, nicht Max (78 da) */
 export function compressZlib(data: Buffer): Buffer {
-	return deflateSync(data, { level: 9 });
+	return deflateSync(data, { level: -1 });
 }
 
 export function compress(data: Buffer, flags: number): Buffer {

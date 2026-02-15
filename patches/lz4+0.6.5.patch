@@ -2,7 +2,7 @@ diff --git a/node_modules/lz4/lib/binding/lz4_binding.cc b/node_modules/lz4/lib/
 index 24fe139..098ed09 100644
 --- a/node_modules/lz4/lib/binding/lz4_binding.cc
 +++ b/node_modules/lz4/lib/binding/lz4_binding.cc
-@@ -342,6 +342,42 @@ NAN_METHOD(LZ4Uncompress) {
+@@ -339,6 +339,42 @@ NAN_METHOD(LZ4Uncompress) {
    info.GetReturnValue().Set(result);
  }
  

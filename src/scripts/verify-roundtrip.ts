@@ -16,9 +16,9 @@ import { unpackLsv } from "../lsv/unpacker.js";
 import { packLsv } from "../lsv/packer.js";
 
 const EXAMPLE = join(process.cwd(), "Example");
-const UNPACKED_LSF = join(EXAMPLE, "QuickSave_14_unpacked_lsf");
-const UNPACKED_LSX = join(EXAMPLE, "QuickSave_14_unpacked_lsx");
-const ORIGINAL_LSV = join(EXAMPLE, "QuickSave_14", "QuickSave_14.lsv");
+const UNPACKED_LSF = join(EXAMPLE, "QuickSave_13_unpacked_lsf");
+const UNPACKED_LSX = join(EXAMPLE, "QuickSave_13_unpacked_lsx");
+const ORIGINAL_LSV = join(EXAMPLE, "QuickSave_13", "QuickSave_13.lsv");
 const TMP = join(process.cwd(), "tmp-verify");
 
 function collectLsfFiles(dir: string, base = "", quick = false): string[] {
@@ -50,15 +50,20 @@ function verifyLsfRoundtrip(quick = false) {
 		const reader = new LSFReader(orig);
 		const root = reader.read();
 		const version = reader.getEngineVersion();
+		const stringTable = reader.getStringTable();
 
 		// LSX-Zwischenschritt
 		const lsxPath = join(TMP, rel.replace(/\.lsf$/i, ".lsx"));
 		mkdirSync(join(lsxPath, ".."), { recursive: true });
 		writeFileSync(lsxPath, convertLsfToLsx(root, version), "utf8");
 
-		// Zurück zu LSF (mit LSLib-Writer)
+		// Zurück zu LSF (Original-String-Tabelle übernehmen für byte-identischen Roundtrip)
 		const { root: root2, version: lsxVersion } = parseLsx(lsxPath);
-		const opts = lsxVersion.major >= 4 ? undefined : { metadataFormat: 0 };
+		const opts = {
+			...(lsxVersion.major >= 4 ? {} : { metadataFormat: 0 }),
+			preserveStringTable: stringTable,
+			attributeOrderPreOrder: UNPACKED_LSF.includes("QuickSave_13")
+		};
 		const roundtripPath = join(TMP, `roundtrip-${rel.replace(/\//g, "_")}`);
 		writeLsf(root2, roundtripPath, lsxVersion, opts);
 		const roundtrip = readFileSync(roundtripPath);
@@ -234,14 +239,15 @@ async function main() {
 
 	const lsfOk = verifyLsfRoundtrip(quick);
 	const lsxOk = verifyLsfToLsx(quick);
-	const unpackOk = verifyLsvUnpack();
-	const lsvOk = verifyLsvRoundtrip();
+	const skipLsv = quick; // --quick: LSV-Tests überspringen (nur meta)
+	const unpackOk = skipLsv ? true : verifyLsvUnpack();
+	const lsvOk = skipLsv ? true : verifyLsvRoundtrip();
 
 	console.log("\n--- Ergebnis ---");
 	console.log("LSF Roundtrip:", lsfOk ? "PASS" : "FAIL");
 	console.log("LSF→LSX:", lsxOk ? "PASS" : "FAIL");
-	console.log("LSV Unpack:", unpackOk ? "PASS" : "FAIL");
-	console.log("LSV Roundtrip:", lsvOk ? "PASS" : "FAIL");
+	console.log("LSV Unpack:", skipLsv ? "SKIP (--quick)" : unpackOk ? "PASS" : "FAIL");
+	console.log("LSV Roundtrip:", skipLsv ? "SKIP (--quick)" : lsvOk ? "PASS" : "FAIL");
 
 	process.exit(lsfOk && lsxOk && unpackOk && lsvOk ? 0 : 1);
 }

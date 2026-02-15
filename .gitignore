@@ -5,7 +5,6 @@ node_modules/
 dist/
 
 # Unpacked / Test outputs
-output_bg3/
 test_pack/
 extracted/
 tmp-verify/

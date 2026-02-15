@@ -8,15 +8,17 @@
  *   convert <input.lsx> [output.lsf]   - LSX zu LSF
  */
 
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { unpackLsv, readPackage, extractFileContent } from "./lsv/unpacker.js";
+const MANIFEST_NAME = "__manifest__.json";
 import { packLsv, packLsvFromLsx } from "./lsv/packer.js";
 import { LSFReader } from "./lsf/reader.js";
 import { convertLsfToLsx } from "./lsx/lsx-writer.js";
 import { parseLsx } from "./lsx/lsx-reader.js";
 import { writeLsf } from "./lsf/writer.js";
+import { patchLsfValues } from "./lsf/patch.js";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -30,8 +32,10 @@ Verwendung:
   unpack <input.lsv> [outputDir]        - LSV entpacken (LSF-Dateien extrahieren)
   extract-lsx <input.lsv> [outputDir]   - LSV → LSX + PNG etc.
   pack-lsx <inputDir> [output.lsv]      - LSX-Ordner zurück zu LSV packen
-  pack <inputDir> [output.lsv]          - Verzeichnis (LSF) zurück zu LSV packen
-  pack/pack-lsx ... --game dos2|bg3     - Version (default: dos2)
+  pack <inputDir> [output.lsv]         - Verzeichnis (LSF) zurück zu LSV packen
+  pack-lsx ... --cleanup                - LSX, .offsets.json, .base.lsf nach Packen löschen
+  patch <input.lsx> [output.lsf]        - LSX-Änderungen in LSF überführen (ohne LSV-Packen)
+  patch <inputDir> [--cleanup]           - Alle LSX im Ordner patchen
   convert <input.lsf> [output.lsx]       - LSF zu LSX konvertieren
   convert <input.lsx> [output.lsf]      - LSX zu LSF konvertieren
 
@@ -40,6 +44,8 @@ Beispiele:
   node dist/cli.js extract-lsx Kiss.lsv ./lsx-only
   node dist/cli.js pack-lsx ./lsx-only Kiss_repacked.lsv
   node dist/cli.js pack ./extracted Kiss_repacked.lsv
+  node dist/cli.js patch ./extracted/meta.lsx --cleanup
+  node dist/cli.js patch ./extracted --cleanup
   node dist/cli.js convert meta.lsf meta.lsx
 `;
 
@@ -105,11 +111,45 @@ try {
 			const lsxPath = join(outputDir, toLsxPath(file.name));
 			writeFileSync(lsxPath, lsx, "utf8");
 			extracted.push(lsxPath);
+			const offsetMap = reader.getAttributeOffsetMap();
+			const offsetsJson: Record<string, { offset: number; length: number; type: number }> = {};
+			for (const [path, info] of offsetMap) {
+				offsetsJson[path] = { offset: info.offset, length: info.length, type: info.type };
+			}
+			const offsetsPath = lsxPath + ".offsets.json";
+			writeFileSync(offsetsPath, JSON.stringify({ attributes: offsetsJson }, null, 0), "utf8");
+			extracted.push(offsetsPath);
+			const baseLsfPath = lsxPath + ".base.lsf";
+			writeFileSync(baseLsfPath, content);
+			extracted.push(baseLsfPath);
 		}
 
 		for (const { file, content } of otherFiles) {
 			writeFileSync(join(outputDir, file.name), content, { flag: "w" });
 			extracted.push(join(outputDir, file.name));
+		}
+
+		const manifestFiles = lsfFiles.map(({ file }) => ({
+			name: toLsxPath(file.name),
+			flags: file.flags ?? 33
+		}));
+		for (const { file } of otherFiles) {
+			manifestFiles.push({ name: file.name, flags: file.flags ?? 33 });
+		}
+		if (manifestFiles.length > 0) {
+			const manifest: {
+				version: number;
+				flags?: number;
+				priority?: number;
+				files: { name: string; flags: number }[];
+			} = {
+				version: header.version,
+				files: manifestFiles
+			};
+			if (header.flags !== undefined) manifest.flags = header.flags;
+			if (header.priority !== undefined) manifest.priority = header.priority;
+			writeFileSync(join(outputDir, MANIFEST_NAME), JSON.stringify(manifest, null, 2), "utf8");
+			extracted.push(join(outputDir, MANIFEST_NAME));
 		}
 
 		console.log(`Fertig: ${extracted.length} Dateien erstellt`);
@@ -120,21 +160,42 @@ try {
 			console.error(`Fehler: Verzeichnis nicht gefunden: ${inputPath}`);
 			process.exit(1);
 		}
-		const gameIdx = args.indexOf("--game");
-		const version = gameIdx >= 0 && args[gameIdx + 1] === "bg3" ? 18 : 13;
+		const cleanup = args.includes("--cleanup");
 		console.log(`Packe LSX-Ordner ${inputPath} → ${output}...`);
-		packLsvFromLsx(inputPath, output, { version });
+		packLsvFromLsx(inputPath, output, { version: 13 });
 		console.log(`Fertig: ${output} erstellt`);
+		if (cleanup) {
+			const deleted: string[] = [];
+			function walk(base: string) {
+				for (const entry of readdirSync(join(inputPath, base), { withFileTypes: true })) {
+					const rel = base ? `${base}/${entry.name}` : entry.name;
+					if (entry.isDirectory()) {
+						if (!entry.name.startsWith(".")) walk(rel);
+					} else if (
+						entry.name.endsWith(".lsx") ||
+						entry.name.endsWith(".offsets.json") ||
+						entry.name.endsWith(".base.lsf")
+					) {
+						const p = join(inputPath, rel);
+						unlinkSync(p);
+						deleted.push(rel);
+					}
+				}
+			}
+			walk("");
+			if (deleted.length > 0) {
+				console.log(`Aufgeräumt: ${deleted.length} Dateien gelöscht`);
+				deleted.forEach((f) => console.log(`  - ${f}`));
+			}
+		}
 	} else if (command === "pack") {
 		const output = outputPath ?? join(process.cwd(), "repacked.lsv");
 		if (!existsSync(inputPath)) {
 			console.error(`Fehler: Verzeichnis nicht gefunden: ${inputPath}`);
 			process.exit(1);
 		}
-		const gameIdx = args.indexOf("--game");
-		const version = gameIdx >= 0 && args[gameIdx + 1] === "bg3" ? 18 : 13;
 		console.log(`Packe ${inputPath} → ${output}...`);
-		packLsv(inputPath, output, { version });
+		packLsv(inputPath, output, { version: 13 });
 		console.log(`Fertig: ${output} erstellt`);
 	} else if (command === "convert") {
 		if (!existsSync(inputPath)) {
@@ -146,16 +207,83 @@ try {
 		console.log(`Konvertiere ${inputPath} → ${output}...`);
 
 		if (isLsf) {
-			const reader = new LSFReader(inputPath);
+			const content = readFileSync(inputPath);
+			const reader = new LSFReader(content);
 			const root = reader.read();
 			const lsx = convertLsfToLsx(root, reader.getEngineVersion());
 			writeFileSync(output, lsx, "utf8");
+			// Offsets + Base für Patch-Workflow (pack-lsx nutzt patchLsfValues)
+			const offsetMap = reader.getAttributeOffsetMap();
+			const offsetsJson: Record<string, { offset: number; length: number; type: number }> = {};
+			for (const [path, info] of offsetMap) {
+				offsetsJson[path] = { offset: info.offset, length: info.length, type: info.type };
+			}
+			writeFileSync(output + ".offsets.json", JSON.stringify({ attributes: offsetsJson }, null, 0), "utf8");
 		} else {
 			const { root, version } = parseLsx(inputPath);
 			const opts = version.major >= 4 ? undefined : { metadataFormat: 0 };
 			writeLsf(root, output, version, opts);
 		}
 		console.log(`Fertig: ${output} erstellt`);
+	} else if (command === "patch") {
+		const cleanup = args.includes("--cleanup");
+		if (!existsSync(inputPath)) {
+			console.error(`Fehler: Nicht gefunden: ${inputPath}`);
+			process.exit(1);
+		}
+		const doPatch = (lsxPath: string): { lsxPath: string; offsetsPath: string; baseLsfPath: string } => {
+			const offsetsPath = lsxPath + ".offsets.json";
+			const baseLsfPath = lsxPath + ".base.lsf";
+			const lsfPath = lsxPath.replace(/\.lsx$/i, ".lsf");
+			const basePath = existsSync(baseLsfPath) ? baseLsfPath : (existsSync(lsfPath) ? lsfPath : null);
+			if (!existsSync(offsetsPath) || !basePath) {
+				console.error(`Fehler: ${lsxPath} benötigt .offsets.json und .lsf/.base.lsf`);
+				process.exit(1);
+			}
+			const baseLsf = readFileSync(basePath);
+			const offsetMap = JSON.parse(readFileSync(offsetsPath, "utf8")) as {
+				attributes: Record<string, { offset: number; length: number; type: number }>;
+			};
+			const { root } = parseLsx(lsxPath);
+			const patched = patchLsfValues(baseLsf, offsetMap, root);
+			writeFileSync(lsfPath, patched);
+			console.log(`  ${lsxPath} → ${lsfPath}`);
+			return { lsxPath, offsetsPath, baseLsfPath };
+		};
+		const toDelete: string[] = [];
+		if (inputPath.toLowerCase().endsWith(".lsx")) {
+			console.log(`Patche ${inputPath} → LSF...`);
+			const { lsxPath, offsetsPath, baseLsfPath } = doPatch(inputPath);
+			if (cleanup) {
+				toDelete.push(lsxPath, offsetsPath);
+				if (existsSync(baseLsfPath)) toDelete.push(baseLsfPath);
+			}
+		} else {
+			console.log(`Patche LSX-Dateien in ${inputPath}...`);
+			function walk(base: string) {
+				for (const entry of readdirSync(join(inputPath, base), { withFileTypes: true })) {
+					const rel = base ? `${base}/${entry.name}` : entry.name;
+					if (entry.isDirectory()) {
+						if (!entry.name.startsWith(".")) walk(rel);
+					} else if (entry.name.endsWith(".lsx")) {
+						const lsxPath = join(inputPath, rel);
+						doPatch(lsxPath);
+						if (cleanup) {
+							toDelete.push(lsxPath, lsxPath + ".offsets.json");
+							if (existsSync(lsxPath + ".base.lsf")) toDelete.push(lsxPath + ".base.lsf");
+						}
+					}
+				}
+			}
+			walk("");
+		}
+		for (const p of toDelete) {
+			if (existsSync(p)) {
+				unlinkSync(p);
+				console.log(`  Gelöscht: ${p}`);
+			}
+		}
+		console.log("Fertig");
 	} else {
 		console.error(`Unbekannter Befehl: ${command}`);
 		process.exit(1);

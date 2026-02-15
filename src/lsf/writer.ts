@@ -19,18 +19,18 @@ function packEngineVersion(v: LsfVersion): number {
 	return (high << 24) | ((v.revision & 0xff) << 16) | ((v.build & 0xff) << 8);
 }
 
-/** Engine-Version zu BG3 Int64-Format (LSF v5+) */
-function packEngineVersionBG3(v: LsfVersion): bigint {
+/** Engine-Version zu LSF v5+ Int64-Format */
+function packEngineVersionV5(v: LsfVersion): bigint {
 	return (BigInt(v.major & 0x7f) << 55n) | (BigInt(v.minor & 0xff) << 47n) | (BigInt(v.revision & 0xffff) << 31n) | BigInt(v.build & 0x7fffffff);
 }
 
-/** C# String.GetHashCode – .NET Framework-Stil für LSLib-Kompatibilität */
+/** C# String.GetHashCode – .NET Framework-Stil (hash = 31*hash + char) für LSLib-Kompatibilität. */
 function dotNetStringHashCode(s: string): number {
 	let hash = 0;
 	for (let i = 0; i < s.length; i++) {
 		hash = ((hash << 5) - hash + s.charCodeAt(i)) | 0;
 	}
-	return hash >>> 0;
+	return hash;
 }
 
 /** LSLib Bucket: (hash & 0x1ff) ^ ((hash>>9) & 0x1ff) ^ ((hash>>18) & 0x1ff) ^ ((hash>>27) & 0x1ff) */
@@ -111,6 +111,67 @@ function flattenNodes(node: LSFNode, parentIdx: number, result: LSFNode[]): numb
 		flattenNodes(child, idx, result);
 	}
 	return idx;
+}
+
+/** Pre-Order: Eltern-Attribute vor Kindern (ältere LSF/V13). */
+function collectAttrsPreOrder(
+	node: LSFNode,
+	flatNodes: LSFNode[],
+	nodeIdx: number,
+	pathPrefix: string,
+	out: { nodeIdx: number; name: string; attr: LSFAttribute; path: string }[]
+): void {
+	const path = pathPrefix ? `${pathPrefix}/${node.name}` : node.name;
+	for (const [name, attr] of Object.entries(node.attributes)) {
+		out.push({ nodeIdx, name, attr, path: `${path}/${name}` });
+	}
+	const nameCounts = new Map<string, number>();
+	for (const c of node.children) {
+		const n = c.name;
+		const k = nameCounts.get(n) ?? 0;
+		nameCounts.set(n, k + 1);
+		const seg = k > 0 ? `${n}[${k}]` : n;
+		const childIdx = flatNodes.indexOf(c);
+		if (childIdx >= 0) collectAttrsPreOrder(c, flatNodes, childIdx, path + "/" + seg, out);
+	}
+}
+
+/** LSLib: Attribute-Reihenfolge – Kinder vor Eltern, aber Eltern-Attribute vor dem letzten Kind (V14+). */
+function collectAttrsLslibOrder(
+	node: LSFNode,
+	flatNodes: LSFNode[],
+	nodeIdx: number,
+	pathPrefix: string,
+	out: { nodeIdx: number; name: string; attr: LSFAttribute; path: string }[]
+): void {
+	const path = pathPrefix ? `${pathPrefix}/${node.name}` : node.name;
+	const children = node.children;
+	const nameCounts = new Map<string, number>();
+	if (children.length > 0) {
+		for (let i = 0; i < children.length - 1; i++) {
+			const c = children[i];
+			const n = c.name;
+			const k = (nameCounts.get(n) ?? 0);
+			nameCounts.set(n, k + 1);
+			const seg = k > 0 ? `${n}[${k}]` : n;
+			const childIdx = flatNodes.indexOf(c);
+			if (childIdx >= 0) collectAttrsLslibOrder(c, flatNodes, childIdx, path + "/" + seg, out);
+		}
+		for (const [name, attr] of Object.entries(node.attributes)) {
+			out.push({ nodeIdx, name, attr, path: `${path}/${name}` });
+		}
+		const last = children[children.length - 1];
+		const n = last.name;
+		const k = nameCounts.get(n) ?? 0;
+		nameCounts.set(n, k + 1);
+		const seg = k > 0 ? `${n}[${k}]` : n;
+		const lastChildIdx = flatNodes.indexOf(last);
+		if (lastChildIdx >= 0) collectAttrsLslibOrder(last, flatNodes, lastChildIdx, path + "/" + seg, out);
+	} else {
+		for (const [name, attr] of Object.entries(node.attributes)) {
+			out.push({ nodeIdx, name, attr, path: `${path}/${name}` });
+		}
+	}
 }
 
 function serializeTranslatedFSString(attr: LSFAttribute, isBG3: boolean): Buffer {
@@ -270,11 +331,11 @@ function getAttributeLength(attr: LSFAttribute, isBG3: boolean = false): number 
 	return serializeAttributeValue(attr, isBG3).length;
 }
 
+/** LZ4-Block (für Strings – LSLib nutzt allowChunked=false) */
 function compressBlock(data: Buffer): Buffer {
 	if (data.length === 0) return data;
 	const maxOut = lz4.encodeBound(data.length);
 	const out = Buffer.alloc(maxOut);
-	// encodeBlockHC = bessere Kompression (LZ4_HC), gleiches Block-Format (decodeBlock-kompatibel)
 	let written = -1;
 	if (typeof lz4.encodeBlockHC === "function") {
 		written = lz4.encodeBlockHC(data, out);
@@ -285,9 +346,34 @@ function compressBlock(data: Buffer): Buffer {
 	return written > 0 ? out.subarray(0, written) : data;
 }
 
+/** LZ4-Frame (chunked) für nodes/attrs/values – LSLib Format: blockIndependence=0, 64KB, HC */
+function compressChunked(data: Buffer): Buffer {
+	if (data.length === 0) return data;
+	const frame = lz4.encode(data, {
+		blockIndependence: false,
+		blockMaxSize: 64 << 10,
+		blockChecksum: false,
+		streamSize: false,
+		streamChecksum: false,
+		highCompression: true
+	});
+	return Buffer.isBuffer(frame) ? frame : Buffer.from(frame);
+}
+
+export interface LSFStringTable {
+	buffer: Buffer;
+	indexMap: Map<string, number>;
+}
+
 export interface WriteLsfOptions {
 	/** 0 = V2 (12 B/node, 12 B/attr, kompakter), 1 = V3 (16 B). DOS2 nutzt 0. */
 	metadataFormat?: number;
+	/** Original-String-Tabelle übernehmen für byte-identischen Roundtrip (nur bestehende Objekte). */
+	preserveStringTable?: LSFStringTable;
+	/** Original-Values-Buffer + Offset-Map für byte-identische Werte (z.B. Bool 0xf7 vs 0x01). */
+	preserveOriginalValues?: { valuesBuffer: Buffer; offsetMap: Map<string, { offset: number; length: number; type: number }> };
+	/** Attribut-Reihenfolge: true = Pre-Order (V13), false = LSLib-Order (V14+). Default: LSLib. */
+	attributeOrderPreOrder?: boolean;
 }
 
 export function writeLsf(root: LSFNode, outputPath: string, version?: LsfVersion, options?: WriteLsfOptions): void {
@@ -302,7 +388,23 @@ export function writeLsf(root: LSFNode, outputPath: string, version?: LsfVersion
 	} else {
 		collectStringsInOrder(root, stringsInOrder);
 	}
-	const { buffer: stringBuf, indexMap } = buildStringTable(stringsInOrder);
+
+	let stringBuf: Buffer;
+	let indexMap: Map<string, number>;
+	if (options?.preserveStringTable) {
+		const { buffer, indexMap: im } = options.preserveStringTable;
+		for (const s of stringsInOrder) {
+			if (!im.has(s)) {
+				throw new Error(`LSF-Writer: String "${s}" nicht in preserveStringTable – nur bestehende Objekte erlaubt`);
+			}
+		}
+		stringBuf = buffer;
+		indexMap = im;
+	} else {
+		const built = buildStringTable(stringsInOrder);
+		stringBuf = built.buffer;
+		indexMap = built.indexMap;
+	}
 
 	const flatNodes: LSFNode[] = [];
 	if (root.name === "save" && root.children.length > 0) {
@@ -318,30 +420,35 @@ export function writeLsf(root: LSFNode, outputPath: string, version?: LsfVersion
 	const valueChunks: Buffer[] = [];
 	let valueOffset = 0;
 	const attrIdxByNode: number[][] = [];
+	for (let i = 0; i < flatNodes.length; i++) attrIdxByNode.push([]);
 
+	// Attribut-Reihenfolge: Pre-Order (V13) oder LSLib-Order (V14+)
+	const attrsPostOrder: { nodeIdx: number; name: string; attr: LSFAttribute; path: string }[] = [];
+	const collectAttrs = options?.attributeOrderPreOrder ? collectAttrsPreOrder : collectAttrsLslibOrder;
 	for (let i = 0; i < flatNodes.length; i++) {
-		attrIdxByNode.push([]);
+		const node = flatNodes[i];
+		const parentIdx = i > 0 ? flatNodes.findIndex((p) => p.children.includes(node)) : -1;
+		if (parentIdx < 0) {
+			collectAttrs(node, flatNodes, i, "", attrsPostOrder);
+		}
+	}
+	let attrIdx = 0;
+	for (const { nodeIdx, name, attr } of attrsPostOrder) {
+		const len = getAttributeLength(attr, isBG3);
+		valueChunks.push(serializeAttributeValue(attr, isBG3));
+		flatAttrs.push({
+			nameIndex: indexMap.get(name) ?? 0,
+			type: attr.type,
+			length: len,
+			nodeIdx
+		});
+		attrIdxByNode[nodeIdx].push(attrIdx);
+		attrIdx++;
 	}
 
-	let attrIdx = 0;
 	for (let nodeIdx = 0; nodeIdx < flatNodes.length; nodeIdx++) {
 		const node = flatNodes[nodeIdx];
-		const attrNames = Object.keys(node.attributes);
-		const firstAttrIdx = attrNames.length > 0 ? attrIdx : -1;
-
-		for (const name of attrNames) {
-			const attr = node.attributes[name];
-			const len = getAttributeLength(attr, isBG3);
-			valueChunks.push(serializeAttributeValue(attr, isBG3));
-			flatAttrs.push({
-				nameIndex: indexMap.get(name) ?? 0,
-				type: attr.type,
-				length: len,
-				nodeIdx
-			});
-			attrIdxByNode[nodeIdx].push(attrIdx);
-			attrIdx++;
-		}
+		const firstAttrIdx = attrIdxByNode[nodeIdx].length > 0 ? attrIdxByNode[nodeIdx][0] : -1;
 
 		let parentIdx = -1;
 		for (let p = 0; p < nodeIdx; p++) {
@@ -420,10 +527,11 @@ export function writeLsf(root: LSFNode, outputPath: string, version?: LsfVersion
 
 	const valuesBuf = Buffer.concat(valueChunks);
 
+	// Strings: LZ4-Block (LSLib allowChunked=false). Nodes/Attrs/Values: LZ4-Frame (chunked, v2+)
 	const stringCompressed = compressBlock(stringBuf);
-	const nodeCompressed = compressBlock(nodeBuf);
-	const attrCompressed = compressBlock(attrBuf);
-	const valueCompressed = compressBlock(valuesBuf);
+	const nodeCompressed = compressChunked(nodeBuf);
+	const attrCompressed = compressChunked(attrBuf);
+	const valueCompressed = compressChunked(valuesBuf);
 
 	let output: Buffer;
 
@@ -445,7 +553,7 @@ export function writeLsf(root: LSFNode, outputPath: string, version?: LsfVersion
 		const header = Buffer.alloc(16);
 		header.write("LSOF", 0);
 		header.writeUInt32LE(6, 4);
-		header.writeBigUInt64LE(packEngineVersionBG3(v), 8);
+		header.writeBigUInt64LE(packEngineVersionV5(v), 8);
 
 		output = Buffer.concat([header, meta, stringCompressed, nodeCompressed, attrCompressed, valueCompressed]);
 	} else {

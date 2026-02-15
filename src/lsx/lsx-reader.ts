@@ -181,20 +181,14 @@ export function parseLsx(pathOrXml: string): { root: LSFNode; version: LsxVersio
 	const regions = extractRegionContent(save);
 	if (regions.length === 0) throw new Error("Invalid LSX: no region/node structure");
 
+	// LSLib: Region IS the first node (LSXReader Zeile 125–129: if stack.Count==0 then node=currentRegion)
+	// Kein Wrapper – der erste Node wird direkt zur Region-Wurzel. LSLib behält die Struktur
+	// (z.B. MetaData ohne Attrs → MetaData mit Attrs → ModuleSettings), kein Flattening.
 	const regionNodes: LSFNode[] = [];
-	for (const { regionId, root: rootEl } of regions) {
+	for (const { root: rootEl } of regions) {
 		const rootNode = parseNode(rootEl);
 		if (!rootNode) continue;
-		let regionRoot: LSFNode = {
-			name: regionId,
-			attributes: {},
-			children: [rootNode]
-		};
-		const inner = regionRoot.children[0];
-		if (inner && Object.keys(inner.attributes).length === 0 && inner.children.length === 1 && inner.children[0].name === inner.name) {
-			regionRoot.children = [inner.children[0]];
-		}
-		regionNodes.push(regionRoot);
+		regionNodes.push(rootNode);
 	}
 
 	let root: LSFNode;

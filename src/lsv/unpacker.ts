@@ -14,7 +14,6 @@ import type { PackagedFileInfo } from "./types.js";
 const LSPK_SIGNATURE = 0x4b50534c;
 const FILE_ENTRY_10_SIZE = 280; // 256 + 4+4+4+4+4+4 (Name, Offset, SizeDisk, SizeUncomp, Part, Flags, Crc)
 const FILE_ENTRY_15_SIZE = 304; // 256 + 8+8+8 + 4+4+4+4
-const FILE_ENTRY_18_SIZE = 272; // 256 + 4+2+1+1+4+4 (Name, Off1, Off2, Part, Flags, SizeDisk, SizeUncomp)
 const COMPRESSION_LZ4 = 2;
 
 function readU32(buf: Buffer, offset: number): number {
@@ -39,34 +38,19 @@ interface PackageHeader {
 	numFiles: number;
 	flags?: number;
 	priority?: number;
-	/** true für BG3 (v15/v16/v18) mit Header am Anfang */
+	/** true für v10+ mit Header am Anfang */
 	headerAtStart?: boolean;
 }
 
 function readHeader(data: Buffer): { header: PackageHeader; headerOffset: number } {
 	const fileSize = data.length;
 
-	// BG3/v10+ format: Signature am Anfang (offset 0)
+	// v10+ format (BG3 etc.): nicht unterstützt – nur DOS2
 	const sigAtStart = readU32(data, 0);
 	if (sigAtStart === LSPK_SIGNATURE && fileSize >= 44) {
 		const version = readU32(data, 4);
 		if (version === 15 || version === 16 || version === 18) {
-			// LSPKHeader16: Version(4), FileListOffset(8), FileListSize(4), Flags(1), Priority(1), Md5(16), NumParts(2)
-			const fileListOffset = Number(readU64(data, 8));
-			const fileListSize = readU32(data, 16);
-			const numParts = data.readUInt16LE(38);
-
-			return {
-				header: {
-					version,
-					fileListOffset,
-					fileListSize,
-					numParts,
-					numFiles: 0,
-					headerAtStart: true
-				},
-				headerOffset: 0
-			};
+			throw new Error("BG3/v10+ LSV-Format wird nicht unterstützt. Nur DOS2 (v13).");
 		}
 	}
 
@@ -81,14 +65,15 @@ function readHeader(data: Buffer): { header: PackageHeader; headerOffset: number
 	const headerOffset = fileSize - headerSize;
 	const headerBuf = data.subarray(headerOffset, headerOffset + 32);
 
+	// LSPKHeader13: Version(4), FileListOffset(4), FileListSize(4), NumParts(2), Flags(1), Priority(1), Md5(16)
 	const header: PackageHeader = {
 		version: readU32(headerBuf, 0),
 		fileListOffset: readU32(headerBuf, 4),
 		fileListSize: readU32(headerBuf, 8),
-		numParts: headerBuf.readUInt16LE(10),
+		numParts: headerBuf.readUInt16LE(12),
 		numFiles: 0,
-		flags: headerBuf[12],
-		priority: headerBuf[13]
+		flags: headerBuf[14],
+		priority: headerBuf[15]
 	};
 
 	if (header.version >= 7 && header.version <= 10 && headerOffset === 0) {
@@ -112,11 +97,11 @@ function readFileListV13(data: Buffer, header: PackageHeader): PackagedFileInfo[
 	const headerSize = header.version > 13 ? 8 : 4;
 	const compressed = data.subarray(offset + headerSize, offset + headerSize + compressedSize);
 
-	// BG3 v18: FileEntry18 (272 bytes). DOS2 v13: FileEntry10/15
-	const expSize = header.version === 18 ? numFiles * FILE_ENTRY_18_SIZE : numFiles * FILE_ENTRY_15_SIZE;
+	// DOS2 v13: FileEntry10/15
+	const expSize = numFiles * FILE_ENTRY_15_SIZE;
 	const decompressed = decompress(compressed, expSize, COMPRESSION_LZ4);
 
-	const entrySize = header.version === 18 ? FILE_ENTRY_18_SIZE : decompressed.length >= numFiles * FILE_ENTRY_15_SIZE ? FILE_ENTRY_15_SIZE : FILE_ENTRY_10_SIZE;
+	const entrySize = decompressed.length >= numFiles * FILE_ENTRY_15_SIZE ? FILE_ENTRY_15_SIZE : FILE_ENTRY_10_SIZE;
 
 	if (decompressed.length < numFiles * entrySize) {
 		throw new Error(`Decompressed file list too small: need ${numFiles * entrySize}, got ${decompressed.length}`);
@@ -135,14 +120,7 @@ function readFileListV13(data: Buffer, header: PackageHeader): PackagedFileInfo[
 		let archivePart: number;
 		let flags: number;
 
-		if (entrySize === FILE_ENTRY_18_SIZE) {
-			// FileEntry18: Name(256), Off1(4), Off2(2), Part(1), Flags(1), SizeDisk(4), SizeUncomp(4)
-			offsetInFile = BigInt(readU32(entry, 256)) | (BigInt(entry.readUInt16LE(260)) << 32n);
-			archivePart = entry[262];
-			flags = entry[263];
-			sizeOnDisk = readU32(entry, 264);
-			uncompressedSize = readU32(entry, 268);
-		} else if (entrySize === FILE_ENTRY_15_SIZE) {
+		if (entrySize === FILE_ENTRY_15_SIZE) {
 			offsetInFile = readU64(entry, 256);
 			sizeOnDisk = Number(readU64(entry, 264));
 			uncompressedSize = Number(readU64(entry, 272));
