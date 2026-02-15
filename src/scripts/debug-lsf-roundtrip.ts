@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Debug: LSF Roundtrip – vergleicht unkomprimierte Blöcke (String, Node, Attr, Values)
- * um zu prüfen, ob die String-Tabelle oder die LZ4-Kompression die Ursache ist.
+ * Debug: LSF Roundtrip – compares uncompressed blocks (String, Node, Attr, Values)
+ * to determine whether the string table or LZ4 compression is the cause.
  */
 
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
@@ -15,7 +15,7 @@ const require = createRequire(import.meta.url);
 const lz4 = require("lz4");
 
 const EXAMPLE = join(process.cwd(), "Example");
-const UNPACKED_LSF = join(EXAMPLE, "QuickSave_13_unpacked_lsf");
+const UNPACKED_LSF = join(EXAMPLE, "QuickSave_14_unpacked_lsf");
 const TMP = join(process.cwd(), "tmp-verify");
 
 function decompressLz4Block(raw: Buffer, uncompressedSize: number): Buffer {
@@ -76,10 +76,10 @@ function extractBlocks(path: string): {
 
 function diffBuffers(a: Buffer, b: Buffer, name: string): void {
 	if (a.equals(b)) {
-		console.log(`  ${name}: IDENTISCH (${a.length} B)`);
+		console.log(`  ${name}: IDENTICAL (${a.length} B)`);
 		return;
 	}
-	console.log(`  ${name}: UNTERSCHIEDLICH (orig ${a.length} B, roundtrip ${b.length} B)`);
+	console.log(`  ${name}: DIFFERENT (orig ${a.length} B, roundtrip ${b.length} B)`);
 	const len = Math.min(a.length, b.length);
 	let first = -1;
 	let count = 0;
@@ -90,7 +90,7 @@ function diffBuffers(a: Buffer, b: Buffer, name: string): void {
 		}
 	}
 	if (first >= 0) {
-		console.log(`    Erste Abweichung bei Offset ${first} (0x${first.toString(16)}), ${count} unterschiedliche Bytes`);
+		console.log(`    First difference at offset ${first} (0x${first.toString(16)}), ${count} differing bytes`);
 		// Hex-Dump um erste Abweichung
 		const start = Math.max(0, first - 8);
 		const end = Math.min(len, first + 24);
@@ -98,7 +98,7 @@ function diffBuffers(a: Buffer, b: Buffer, name: string): void {
 		console.log(`    roundtrip: ${b.subarray(start, end).toString("hex")}`);
 	}
 	if (a.length !== b.length) {
-		console.log(`    Längenunterschied: ${Math.abs(a.length - b.length)} B`);
+		console.log(`    Length difference: ${Math.abs(a.length - b.length)} B`);
 	}
 }
 
@@ -106,7 +106,7 @@ function main() {
 	const rel = "meta.lsf";
 	const origPath = join(UNPACKED_LSF, rel);
 
-	// Roundtrip erzeugen (mit preserveStringTable für byte-identische String-Tabelle)
+	// Create roundtrip (with preserveStringTable for byte-identical string table)
 	const orig = readFileSync(origPath);
 	const reader = new LSFReader(orig);
 	const root = reader.read();
@@ -120,10 +120,10 @@ function main() {
 	writeLsf(root2, roundtripPath, lsxVersion, {
 		metadataFormat: 0,
 		preserveStringTable: stringTable,
-		attributeOrderPreOrder: UNPACKED_LSF.includes("QuickSave_13")
+		attributeOrderPreOrder: UNPACKED_LSF.includes("QuickSave_14")
 	});
 
-	console.log("=== LSF meta.lsf: Unkomprimierte Blöcke vergleichen ===\n");
+	console.log("=== LSF meta.lsf: Compare uncompressed blocks ===\n");
 
 	const origBlocks = extractBlocks(origPath);
 	const roundBlocks = extractBlocks(roundtripPath);
@@ -133,7 +133,7 @@ function main() {
 	diffBuffers(origBlocks.attrs, roundBlocks.attrs, "Attributes");
 	diffBuffers(origBlocks.values, roundBlocks.values, "Values");
 
-	console.log("\n--- Meta-Größen ---");
+	console.log("\n--- Meta sizes ---");
 	console.log("  orig:      strings uc=", origBlocks.meta.strings.uncompressedSize, "cc=", origBlocks.meta.strings.compressedSize);
 	console.log("  roundtrip: strings uc=", roundBlocks.meta.strings.uncompressedSize, "cc=", roundBlocks.meta.strings.compressedSize);
 }

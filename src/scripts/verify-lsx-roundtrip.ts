@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Verifiziert den LSX-Roundtrip: LSV → extract-lsx → pack-lsx → LSV
- * Prüft ob die repackte LSV byte-identisch mit dem Original ist.
+ * Verifies LSX roundtrip: LSV → extract-lsx → pack-lsx → LSV.
+ * Checks whether the repacked LSV is byte-identical to the original.
  *
- * Verwendung: node dist/scripts/verify-lsx-roundtrip.js [input.lsv]
+ * Usage: node dist/scripts/verify-lsx-roundtrip.js [input.lsv]
  */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
@@ -29,7 +29,7 @@ function extractLsxFromLsv(inputLsv: string, outputDir: string): void {
 	const lsfFiles: Array<{ file: (typeof files)[0]; content: Buffer }> = [];
 	const otherFiles: Array<{ file: (typeof files)[0]; content: Buffer }> = [];
 
-	const quick = process.argv.includes("--quick"); // --quick: nur meta (schneller Test)
+	const quick = process.argv.includes("--quick"); // --quick: meta only (faster test)
 	for (const file of files) {
 		if (quick && file.name !== "meta.lsf" && file.name.toLowerCase().endsWith(".lsf")) continue;
 		const content = extractFileContent(data, file, dataOffset);
@@ -74,42 +74,42 @@ function main() {
 	const inputLsv = process.argv[2] ?? join(process.cwd(), "Example", "QuickSave_14", "QuickSave_14.lsv");
 
 	if (!existsSync(inputLsv)) {
-		console.error(`LSV nicht gefunden: ${inputLsv}`);
+		console.error(`LSV not found: ${inputLsv}`);
 		process.exit(1);
 	}
 
 	const extractDir = join(TMP, "extracted");
 	const repackedPath = join(TMP, "repacked.lsv");
 
-	console.log("\n=== LSX-Roundtrip-Verifikation ===\n");
+	console.log("\n=== LSX Roundtrip Verification ===\n");
 	console.log(`Original: ${inputLsv}\n`);
 
 	// 1. Extract
 	console.log("1. extract-lsx (LSV → LSX)...");
 	extractLsxFromLsv(inputLsv, extractDir);
-	console.log("   Fertig.\n");
+	console.log("   Done.\n");
 
 	// 2. Pack
 	console.log("2. pack-lsx (LSX → LSV)...");
 	packLsvFromLsx(extractDir, repackedPath, { version: 13 });
-	console.log("   Fertig.\n");
+	console.log("   Done.\n");
 
 	// 3. Compare
-	console.log("3. Byte-Vergleich...");
+	console.log("3. Byte comparison...");
 	const original = readFileSync(inputLsv);
 	const repacked = readFileSync(repackedPath);
 
 	const match = original.equals(repacked);
 	if (match) {
-		console.log("\n✓ ERFOLG: Repackte LSV ist byte-identisch mit Original");
+		console.log("\n✓ SUCCESS: Repacked LSV is byte-identical to original");
 	} else {
-		console.log("\n✗ Abweichung gefunden:");
+		console.log("\n✗ Difference found:");
 		console.log(`  Original:  ${original.length} Bytes`);
 		console.log(`  Repacked:  ${repacked.length} Bytes`);
-		// Erste Abweichung finden
+		// Find first difference
 		for (let i = 0; i < Math.min(original.length, repacked.length); i++) {
 			if (original[i] !== repacked[i]) {
-				console.log(`  Erste Abweichung bei Offset ${i} (0x${i.toString(16)})`);
+				console.log(`  First difference at offset ${i} (0x${i.toString(16)})`);
 				break;
 			}
 		}

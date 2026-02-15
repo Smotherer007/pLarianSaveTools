@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Verifikation gegen Example-Daten
- * --unpack: LSV unpack → Byte-Vergleich mit QuickSave_14_unpacked_lsf (LSLib-Referenz)
- * LSF: Example/QuickSave_14_unpacked_lsf/*.lsf → LSX → LSF → Byte-Vergleich
- * LSV Roundtrip: unpack → pack → Byte-Vergleich
+ * Verification against Example data
+ * --unpack: LSV unpack → byte comparison with QuickSave_14_unpacked_lsf (LSLib reference)
+ * LSF: Example/QuickSave_14_unpacked_lsf/*.lsf → LSX → LSF → byte comparison
+ * LSV Roundtrip: unpack → pack → byte comparison
  */
 
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync } from "node:fs";
@@ -16,9 +16,9 @@ import { unpackLsv } from "../lsv/unpacker.js";
 import { packLsv } from "../lsv/packer.js";
 
 const EXAMPLE = join(process.cwd(), "Example");
-const UNPACKED_LSF = join(EXAMPLE, "QuickSave_13_unpacked_lsf");
-const UNPACKED_LSX = join(EXAMPLE, "QuickSave_13_unpacked_lsx");
-const ORIGINAL_LSV = join(EXAMPLE, "QuickSave_13", "QuickSave_13.lsv");
+const UNPACKED_LSF = join(EXAMPLE, "QuickSave_14_unpacked_lsf");
+const UNPACKED_LSX = join(EXAMPLE, "QuickSave_14_unpacked_lsx");
+const ORIGINAL_LSV = join(EXAMPLE, "QuickSave_14", "QuickSave_14.lsv");
 const TMP = join(process.cwd(), "tmp-verify");
 
 function collectLsfFiles(dir: string, base = "", quick = false): string[] {
@@ -28,7 +28,7 @@ function collectLsfFiles(dir: string, base = "", quick = false): string[] {
 		if (entry.isDirectory() && !quick) {
 			files.push(...collectLsfFiles(dir, rel, quick));
 		} else if (entry.name.toLowerCase().endsWith(".lsf")) {
-			if (quick && !rel.endsWith("meta.lsf")) continue; // --quick: nur meta.lsf
+			if (quick && !rel.endsWith("meta.lsf")) continue; // --quick: meta.lsf only
 			files.push(rel);
 		}
 	}
@@ -40,7 +40,7 @@ function verifyLsfRoundtrip(quick = false) {
 	mkdirSync(TMP, { recursive: true });
 
 	const lsfFiles = collectLsfFiles(UNPACKED_LSF, "", quick);
-	if (quick) console.log("(--quick: nur meta.lsf)\n");
+	if (quick) console.log("(--quick: meta.lsf only)\n");
 	let ok = 0;
 	let diff = 0;
 
@@ -78,15 +78,15 @@ function verifyLsfRoundtrip(quick = false) {
 		}
 	}
 
-	console.log(`\nLSF: ${ok} identisch, ${diff} abweichend von ${lsfFiles.length} Dateien`);
+	console.log(`\nLSF: ${ok} identical, ${diff} differing of ${lsfFiles.length} files`);
 	return diff === 0;
 }
 
-/** LSF→LSX: Unsere Ausgabe byte-identisch mit LSLib-Referenz (QuickSave_14_unpacked_lsx) */
+/** LSF→LSX: Our output byte-identical with LSLib reference (QuickSave_14_unpacked_lsx) */
 function verifyLsfToLsx(quick = false): boolean {
-	console.log("\n=== LSF → LSX (Vergleich mit LSLib-Referenz) ===\n");
+	console.log("\n=== LSF → LSX (compare with LSLib reference) ===\n");
 	if (!existsSync(UNPACKED_LSX)) {
-		console.log("  Übersprungen: QuickSave_14_unpacked_lsx nicht gefunden");
+		console.log("  Skipped: QuickSave_14_unpacked_lsx not found");
 		return true;
 	}
 	mkdirSync(TMP, { recursive: true });
@@ -99,7 +99,7 @@ function verifyLsfToLsx(quick = false): boolean {
 		const lsxRel = rel.replace(/\.lsf$/i, ".lsx");
 		const refPath = join(UNPACKED_LSX, lsxRel);
 		if (!existsSync(refPath)) {
-			console.log(`  SKIP ${rel} (keine LSX-Referenz)`);
+			console.log(`  SKIP ${rel} (no LSX reference)`);
 			continue;
 		}
 		const origPath = join(UNPACKED_LSF, rel);
@@ -119,7 +119,7 @@ function verifyLsfToLsx(quick = false): boolean {
 		}
 	}
 
-	console.log(`\nLSF→LSX: ${ok} identisch, ${diff} abweichend`);
+	console.log(`\nLSF→LSX: ${ok} identical, ${diff} differing`);
 	return diff === 0;
 }
 
@@ -137,15 +137,15 @@ function collectAllFiles(dir: string, base: string = ""): string[] {
 	return files;
 }
 
-/** LSV Unpack-Verifikation: Entpackte Dateien byte-identisch mit LSLib-Referenz */
+/** LSV Unpack verification: Extracted files byte-identical with LSLib reference */
 function verifyLsvUnpack(): boolean {
-	console.log("\n=== LSV Unpack (LSV → extract, Vergleich mit LSLib-Referenz) ===\n");
+	console.log("\n=== LSV Unpack (LSV → extract, compare with LSLib reference) ===\n");
 	if (!existsSync(ORIGINAL_LSV)) {
-		console.log("  Übersprungen: QuickSave_14.lsv nicht gefunden");
+		console.log("  Skipped: QuickSave_14.lsv not found");
 		return true;
 	}
 	if (!existsSync(UNPACKED_LSF)) {
-		console.error("  Beispiel-Referenz QuickSave_14_unpacked_lsf nicht gefunden");
+		console.error("  Example reference QuickSave_14_unpacked_lsf not found");
 		return false;
 	}
 
@@ -177,14 +177,14 @@ function verifyLsvUnpack(): boolean {
 		}
 	}
 
-	console.log(`\nLSV Unpack: ${ok} identisch, ${diff} abweichend, ${missing} fehlend von ${refFiles.length} Dateien`);
+	console.log(`\nLSV Unpack: ${ok} identical, ${diff} differing, ${missing} missing of ${refFiles.length} files`);
 	return diff === 0 && missing === 0;
 }
 
 function verifyLsvRoundtrip() {
 	console.log("\n=== LSV Roundtrip (LSV → unpack → pack) ===\n");
 	if (!existsSync(ORIGINAL_LSV)) {
-		console.log("  Übersprungen: QuickSave_14.lsv nicht gefunden");
+		console.log("  Skipped: QuickSave_14.lsv not found");
 		return true;
 	}
 
@@ -200,7 +200,7 @@ function verifyLsvRoundtrip() {
 
 	const match = orig.equals(repacked);
 	if (match) {
-		console.log("  OK  LSV Roundtrip byte-identisch");
+		console.log("  OK  LSV Roundtrip byte-identical");
 	} else {
 		console.log(`  DIFF LSV (orig ${orig.length} B, repacked ${repacked.length} B)`);
 	}
@@ -211,39 +211,39 @@ async function main() {
 	const quick = process.argv.includes("--quick");
 	const unpackOnly = process.argv.includes("--unpack");
 	const lsf2lsxOnly = process.argv.includes("--lsf2lsx");
-	console.log("pLarianSaveTools – Verifikation");
-	console.log("Example-Pfad:", EXAMPLE);
+	console.log("pLarianSaveTools – Verification");
+	console.log("Example path:", EXAMPLE);
 
 	if (unpackOnly) {
 		const unpackOk = verifyLsvUnpack();
-		console.log("\n--- Ergebnis ---");
+		console.log("\n--- Result ---");
 		console.log("LSV Unpack:", unpackOk ? "PASS" : "FAIL");
 		process.exit(unpackOk ? 0 : 1);
 	}
 
 	if (lsf2lsxOnly) {
 		if (!existsSync(UNPACKED_LSF)) {
-			console.error("Example/QuickSave_14_unpacked_lsf nicht gefunden");
+			console.error("Example/QuickSave_14_unpacked_lsf not found");
 			process.exit(1);
 		}
 		const lsxOk = verifyLsfToLsx(quick);
-		console.log("\n--- Ergebnis ---");
+		console.log("\n--- Result ---");
 		console.log("LSF→LSX:", lsxOk ? "PASS" : "FAIL");
 		process.exit(lsxOk ? 0 : 1);
 	}
 
 	if (!existsSync(UNPACKED_LSF)) {
-		console.error("Example/QuickSave_14_unpacked_lsf nicht gefunden");
+		console.error("Example/QuickSave_14_unpacked_lsf not found");
 		process.exit(1);
 	}
 
 	const lsfOk = verifyLsfRoundtrip(quick);
 	const lsxOk = verifyLsfToLsx(quick);
-	const skipLsv = quick; // --quick: LSV-Tests überspringen (nur meta)
+	const skipLsv = quick; // --quick: skip LSV tests (meta only)
 	const unpackOk = skipLsv ? true : verifyLsvUnpack();
 	const lsvOk = skipLsv ? true : verifyLsvRoundtrip();
 
-	console.log("\n--- Ergebnis ---");
+	console.log("\n--- Result ---");
 	console.log("LSF Roundtrip:", lsfOk ? "PASS" : "FAIL");
 	console.log("LSF→LSX:", lsxOk ? "PASS" : "FAIL");
 	console.log("LSV Unpack:", skipLsv ? "SKIP (--quick)" : unpackOk ? "PASS" : "FAIL");

@@ -17,7 +17,6 @@
 		"unpack": "node dist/cli.js unpack",
 		"convert": "node dist/cli.js convert",
 		"start": "node dist/cli.js",
-		"dev": "node dist/server.js",
 		"pretty": "npx prettier --write '**/*.{js,ts,json,xml,html,css,scss,md,yaml,yml}'",
 		"verify": "node dist/scripts/verify-roundtrip.js",
 		"verify:quick": "node dist/scripts/verify-roundtrip.js --quick",

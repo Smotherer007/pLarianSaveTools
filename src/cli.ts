@@ -24,18 +24,18 @@ const inputPath = args[1];
 const outputPath = args[2];
 
 const HELP = `
-DOS2 Savegame Tools - LSV Entpacker & LSF↔LSX Konverter
+DOS2 Savegame Tools - LSV unpacker & LSF↔LSX converter
 
-Verwendung:
-  unpack <input.lsv> [outputDir]        - Extract LSV (LSF files)
-  extract-lsx <input.lsv> [outputDir]   - LSV → LSX + PNG etc.
-  pack-lsx <inputDir> [output.lsv]      - Pack LSX folder back to LSV
+Usage:
+  unpack <input.lsv> [outputDir]       - Extract LSV (LSF files)
+  extract-lsx <input.lsv> [outputDir]  - LSV → LSX + PNG etc.
+  pack-lsx <inputDir> [output.lsv]    - Pack LSX folder back to LSV
   pack <inputDir> [output.lsv]         - Pack directory (LSF) back to LSV
-  pack-lsx ... --cleanup                - Remove LSX after packing
-  convert <input.lsf> [output.lsx]       - LSF to LSX
-  convert <input.lsx> [output.lsf]      - LSX to LSF
+  pack-lsx ... --cleanup               - Remove LSX after packing
+  convert <input.lsf> [output.lsx]    - LSF to LSX
+  convert <input.lsx> [output.lsf]    - LSX to LSF
 
-Beispiele:
+Examples:
   node dist/cli.js unpack Kiss.lsv ./extracted
   node dist/cli.js extract-lsx Kiss.lsv ./lsx-only
   node dist/cli.js pack-lsx ./lsx-only Kiss_repacked.lsv
@@ -199,7 +199,7 @@ try {
 			console.log(`Done: ${output} created`);
 		}
 	} else {
-		console.error(`Unbekannter Befehl: ${command}`);
+		console.error(`Unknown command: ${command}`);
 		process.exit(1);
 	}
 } catch (err) {

@@ -216,7 +216,7 @@ export function packLsv(inputDir: string, outputPath: string, options?: PackLsvO
 	for (const f of filesToPack) {
 		const filePath = join(inputDir, f.name);
 		if (!existsSync(filePath)) {
-			throw new Error(`Datei nicht gefunden: ${filePath}`);
+			throw new Error(`File not found: ${filePath}`);
 		}
 		const raw = readFileSync(filePath);
 		rawForHash.push({ name: f.name, raw });
