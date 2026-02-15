@@ -425,6 +425,23 @@ export class LSFReader {
 		}
 	}
 
+	/** metadataFormat 0: Sort children by LSLib order (firstOccurrence per type, then index). */
+	private orderChildrenByFirstOccurrence(childIndices: number[]): number[] {
+		const firstOccurrence = new Map<string, number>();
+		for (const i of childIndices) {
+			const name = this.resolveName(this.nodes[i].nameIndex);
+			if (!firstOccurrence.has(name)) firstOccurrence.set(name, i);
+		}
+		return [...childIndices].sort((a, b) => {
+			const nameA = this.resolveName(this.nodes[a].nameIndex);
+			const nameB = this.resolveName(this.nodes[b].nameIndex);
+			const firstA = firstOccurrence.get(nameA) ?? a;
+			const firstB = firstOccurrence.get(nameB) ?? b;
+			if (firstA !== firstB) return firstA - firstB;
+			return a - b;
+		});
+	}
+
 	private buildChildrenMap(): void {
 		this.childrenByParent = new Map<number, number[]>();
 		for (let i = 0; i < this.nodes.length; i++) {
@@ -497,10 +514,10 @@ export class LSFReader {
 			attrIdx = attrEntry.nextAttributeIndex;
 		}
 
-		// Kinder in LSF-Reihenfolge (nextSiblingIndex-Kette bei metadataFormat 1)
+		// Children in LSF order (nextSiblingIndex chain for metadataFormat 1)
 		const childIndices = this.childrenByParent.get(nodeIdx) ?? [];
 		if (childIndices.length > 0 && this.meta.metadataFormat === 1) {
-			// metadataFormat 1: nextSiblingIndex-Kette für korrekte Reihenfolge
+			// metadataFormat 1: nextSiblingIndex chain for correct order
 			const referenced = new Set(childIndices.map((i) => this.nodes[i].nextSiblingIndex).filter((s) => s >= 0));
 			let first = childIndices.find((i) => !referenced.has(i));
 			if (first === undefined) first = childIndices[0];
@@ -514,10 +531,8 @@ export class LSFReader {
 				node.children.push(this.buildNodeRecursive(i, depth + 1));
 			}
 		} else {
-			// metadataFormat 0: LSLib ReadRegions iteriert Nodes in Datei-Reihenfolge (i=0..N),
-			// AppendChild fügt in dieser Reihenfolge hinzu → Children-Reihenfolge = LSF-Datei-Reihenfolge
-			childIndices.sort((a, b) => a - b);
-			for (const i of childIndices) {
+			// metadataFormat 0: LSLib order (firstOccurrence per type)
+			for (const i of this.orderChildrenByFirstOccurrence(childIndices)) {
 				node.children.push(this.buildNodeRecursive(i, depth + 1));
 			}
 		}
@@ -591,8 +606,7 @@ export class LSFReader {
 				cur = this.nodes[cur].nextSiblingIndex;
 			}
 		} else {
-			childIndices.sort((a, b) => a - b);
-			ordered = childIndices;
+			ordered = this.orderChildrenByFirstOccurrence(childIndices);
 		}
 
 		const nameCounts = new Map<string, number>();

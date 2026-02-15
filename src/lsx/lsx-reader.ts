@@ -7,6 +7,8 @@ export interface LsxVersion {
 	minor: number;
 	revision: number;
 	build: number;
+	/** e.g. "v1,bswap_guids" – UUIDs in LSX are byte-swapped */
+	lslibMeta?: string;
 }
 
 function parseXml(xml: string): any {
@@ -33,7 +35,8 @@ function parseVersion(versionEl: any): LsxVersion {
 		major: parseInt(a.major ?? "4", 10),
 		minor: parseInt(a.minor ?? "0", 10),
 		revision: parseInt(a.revision ?? "0", 10),
-		build: parseInt(a.build ?? "0", 10)
+		build: parseInt(a.build ?? "0", 10),
+		lslibMeta: a.lslib_meta ?? a.lslibMeta
 	};
 }
 
@@ -88,11 +91,23 @@ function parseTranslatedFSStringArguments(argsEl: any): TranslatedFSStringValue[
 	return result.length > 0 ? result : undefined;
 }
 
-function parseAttributeValue(type: NodeAttributeType, valueStr: string, handle?: string, el?: any): any {
+/** bswap_guids: Convert LSX format back to normal format for LSF writing (inverse of formatUuidForLsx) */
+function parseUuidFromLsx(lsxUuid: string): string {
+	const m = lsxUuid.match(/^([0-9a-f]{8})-([0-9a-f]{4})-([0-9a-f]{4})-([0-9a-f]{4})-([0-9a-f]{12})$/i);
+	if (!m) return lsxUuid;
+	const rev = (s: string) => (s.match(/../g) ?? []).reverse().join("");
+	const swap2 = (s: string) => (s.length === 4 ? s[2] + s[3] + s[0] + s[1] : s);
+	return `${rev(m[1])}-${swap2(m[2])}-${swap2(m[3])}-${m[4]}-${m[5]}`;
+}
+
+function parseAttributeValue(type: NodeAttributeType, valueStr: string, handle?: string, el?: any, bswapGuids?: boolean): any {
 	if (valueStr === undefined) valueStr = "";
 	if (type === NodeAttributeType.TranslatedString || type === NodeAttributeType.TranslatedFSString) {
 		const args = type === NodeAttributeType.TranslatedFSString && el ? parseTranslatedFSStringArguments(el.arguments) : undefined;
 		return { value: valueStr, handle: handle ?? "", ...(args && args.length > 0 ? { arguments: args } : {}) };
+	}
+	if (type === NodeAttributeType.UUID && bswapGuids && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(valueStr)) {
+		return parseUuidFromLsx(valueStr);
 	}
 	if (type === NodeAttributeType.Bool) {
 		return valueStr === "True" || valueStr === "true" || valueStr === "1";
@@ -112,7 +127,7 @@ function parseAttributeValue(type: NodeAttributeType, valueStr: string, handle?:
 	return valueStr;
 }
 
-function parseAttribute(el: any): LSFAttribute | null {
+function parseAttribute(el: any, bswapGuids: boolean): LSFAttribute | null {
 	const a = getAttrs(el);
 	if (!a.id) return null;
 	const type = parseType(a.type ?? "20");
@@ -121,11 +136,11 @@ function parseAttribute(el: any): LSFAttribute | null {
 	return {
 		name: a.id,
 		type,
-		value: parseAttributeValue(type, valueStr, handle, el)
+		value: parseAttributeValue(type, valueStr, handle, el, bswapGuids)
 	};
 }
 
-function parseNode(el: any): LSFNode | null {
+function parseNode(el: any, bswapGuids: boolean): LSFNode | null {
 	const a = getAttrs(el);
 	const name = a.id ?? "Node";
 	const node: LSFNode = { name, attributes: {}, children: [] };
@@ -134,7 +149,7 @@ function parseNode(el: any): LSFNode | null {
 	const attrs = el?.attribute ?? [];
 	const attrList = Array.isArray(attrs) ? attrs : [attrs];
 	for (const attrEl of attrList) {
-		const attr = parseAttribute(attrEl);
+		const attr = parseAttribute(attrEl, bswapGuids);
 		if (attr) node.attributes[attr.name] = attr;
 	}
 
@@ -144,7 +159,7 @@ function parseNode(el: any): LSFNode | null {
 		const nodeList = Array.isArray(nodes) ? nodes : [nodes];
 		for (const childEl of nodeList) {
 			if (childEl && typeof childEl === "object") {
-				const child = parseNode(childEl);
+				const child = parseNode(childEl, bswapGuids);
 				if (child) node.children.push(child);
 			}
 		}
@@ -181,12 +196,14 @@ export function parseLsx(pathOrXml: string): { root: LSFNode; version: LsxVersio
 	const regions = extractRegionContent(save);
 	if (regions.length === 0) throw new Error("Invalid LSX: no region/node structure");
 
-	// LSLib: Region IS the first node (LSXReader Zeile 125–129: if stack.Count==0 then node=currentRegion)
-	// Kein Wrapper – der erste Node wird direkt zur Region-Wurzel. LSLib behält die Struktur
-	// (z.B. MetaData ohne Attrs → MetaData mit Attrs → ModuleSettings), kein Flattening.
+	const bswapGuids = version.lslibMeta?.includes("bswap_guids") ?? false;
+
+	// LSLib: Region IS the first node (LSXReader line 125–129: if stack.Count==0 then node=currentRegion)
+	// No wrapper – first node becomes region root directly. LSLib preserves structure
+	// (e.g. MetaData without attrs → MetaData with attrs → ModuleSettings), no flattening.
 	const regionNodes: LSFNode[] = [];
 	for (const { root: rootEl } of regions) {
-		const rootNode = parseNode(rootEl);
+		const rootNode = parseNode(rootEl, bswapGuids);
 		if (!rootNode) continue;
 		regionNodes.push(rootNode);
 	}
