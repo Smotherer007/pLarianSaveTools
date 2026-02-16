@@ -21,7 +21,7 @@
 					<attribute id="GMCampaignId" type="22" value="" />
 					<attribute id="GMCampaignName" type="30" value="" />
 					<attribute id="SaveGameType" type="1" value="1" />
-					<attribute id="Difficulty" type="1" value="1" />
+					<attribute id="Difficulty" type="1" value="2" />
 					<children>
 						<node id="ModuleSettings">
 							<children>

@@ -10,9 +10,8 @@ import { LSFReader } from "../lsf/reader.js";
 import { writeLsf } from "../lsf/writer.js";
 import { parseLsx } from "../lsx/lsx-reader.js";
 import { convertLsfToLsx } from "../lsx/lsx-writer.js";
-import { createRequire } from "node:module";
-const require = createRequire(import.meta.url);
-const lz4 = require("lz4");
+import { decompressFrameSync } from "lz4-napi";
+import { decompressLZ4 } from "../lsv/compression.js";
 
 const EXAMPLE = join(process.cwd(), "Example");
 const UNPACKED_LSF = join(EXAMPLE, "QuickSave_14_unpacked_lsf");
@@ -20,21 +19,9 @@ const TMP = join(process.cwd(), "tmp-verify");
 
 function decompressLz4Block(raw: Buffer, uncompressedSize: number): Buffer {
 	if (raw.readUInt32LE(0) === 0x184d2204) {
-		const dec = lz4.decode(raw);
-		return Buffer.isBuffer(dec) ? dec : Buffer.from(dec);
+		return decompressFrameSync(raw);
 	}
-	const out = Buffer.alloc(Math.max(uncompressedSize, raw.length * 10));
-	const decoded = lz4.decodeBlock(raw, out);
-	if (decoded < 0) {
-		try {
-			const dec = lz4.decode(raw);
-			const buf = Buffer.isBuffer(dec) ? dec : Buffer.from(dec);
-			return buf.subarray(0, Math.min(buf.length, uncompressedSize * 2));
-		} catch {
-			throw new Error(`LZ4 decode failed: ${decoded}`);
-		}
-	}
-	return out.subarray(0, decoded);
+	return decompressLZ4(raw, uncompressedSize);
 }
 
 interface BlockMeta {

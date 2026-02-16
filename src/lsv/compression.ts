@@ -5,19 +5,18 @@
 
 import { inflateSync, deflateSync } from "node:zlib";
 import { decompress as decompressZstd } from "fzstd";
+import { uncompressSync, compressSync } from "lz4-napi";
 import { getCompressionMethod } from "./types.js";
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
-const lz4 = require("lz4");
 const zstdNapi = require("zstd-napi");
 
+/** lz4-napi nutzt decompress_size_prepended – Größe voranstellen */
 export function decompressLZ4(compressed: Buffer, decompressedSize: number): Buffer {
-	const output = Buffer.alloc(Math.max(decompressedSize, compressed.length * 10));
-	const result = lz4.decodeBlock(compressed, output);
-	if (result < 0) {
-		throw new Error(`LZ4 decompression failed: ${result}`);
-	}
-	return output.subarray(0, result);
+	const withSize = Buffer.allocUnsafe(4 + compressed.length);
+	withSize.writeUInt32LE(decompressedSize, 0);
+	compressed.copy(withSize, 4);
+	return uncompressSync(withSize);
 }
 
 export function decompressZlib(compressed: Buffer): Buffer {
@@ -45,12 +44,10 @@ export function decompress(compressed: Buffer, decompressedSize: number, flags: 
 	}
 }
 
+/** lz4-napi prependet Größe – LSV erwartet nur komprimierte Bytes */
 export function compressLZ4(data: Buffer): Buffer {
-	const maxOut = lz4.encodeBound(data.length);
-	const out = Buffer.alloc(maxOut);
-	const written = lz4.encodeBlock(data, out);
-	if (written < 0) throw new Error(`LZ4 compression failed: ${written}`);
-	return out.subarray(0, written);
+	const out = compressSync(data);
+	return out.length > 4 ? out.subarray(4) : data;
 }
 
 /** Zlib with default level (78 9c) – like DOS2/LSLib, not max (78 da) */

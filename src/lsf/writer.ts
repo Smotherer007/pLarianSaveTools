@@ -2,9 +2,7 @@ import { writeFileSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { LSFNode, LSFAttribute, NodeAttributeType, TranslatedFSStringValue } from "./types.js";
-import { createRequire } from "node:module";
-const require = createRequire(import.meta.url);
-const lz4 = require("lz4");
+import { compressSync, compressFrameSync } from "lz4-napi";
 
 export interface LsfVersion {
 	major: number;
@@ -338,33 +336,21 @@ function getAttributeLength(attr: LSFAttribute, isBG3: boolean = false): number 
 	return serializeAttributeValue(attr, isBG3).length;
 }
 
-/** LZ4 block (for strings – LSLib uses allowChunked=false) */
+/** LZ4 block (for strings) – lz4-napi prependet Größe, LSF erwartet nur komprimierte Bytes */
 function compressBlock(data: Buffer): Buffer {
 	if (data.length === 0) return data;
-	const maxOut = lz4.encodeBound(data.length);
-	const out = Buffer.alloc(maxOut);
-	let written = -1;
-	if (typeof lz4.encodeBlockHC === "function") {
-		written = lz4.encodeBlockHC(data, out);
+	try {
+		const out = compressSync(data);
+		return out.length > 4 ? out.subarray(4) : data;
+	} catch {
+		return data;
 	}
-	if (written <= 0) {
-		written = lz4.encodeBlock(data, out);
-	}
-	return written > 0 ? out.subarray(0, written) : data;
 }
 
-/** LZ4-Frame (chunked) for nodes/attrs/values – LSLib format: blockIndependence=0, 64KB, HC */
+/** LZ4-Frame (chunked) for nodes/attrs/values */
 function compressChunked(data: Buffer): Buffer {
 	if (data.length === 0) return data;
-	const frame = lz4.encode(data, {
-		blockIndependence: false,
-		blockMaxSize: 64 << 10,
-		blockChecksum: false,
-		streamSize: false,
-		streamChecksum: false,
-		highCompression: true
-	});
-	return Buffer.isBuffer(frame) ? frame : Buffer.from(frame);
+	return compressFrameSync(data);
 }
 
 export interface LSFStringTable {

@@ -1,10 +1,15 @@
 import { readFileSync } from "node:fs";
 import { LSFAttribute, LSFAttributeEntry, LSFHeader, LSFMetadataBlock, LSFNode, LSFNodeEntry, NodeAttributeType, TranslatedFSStringValue } from "./types.js";
 import { decompress as decompressZstd } from "fzstd";
+import { uncompressSync, decompressFrameSync } from "lz4-napi";
 
-import { createRequire } from "node:module";
-const require = createRequire(import.meta.url);
-const lz4 = require("lz4");
+/** lz4-napi nutzt decompress_size_prepended – Größe muss vor den komprimierten Daten stehen */
+function uncompressLz4Block(compressed: Buffer, uncompressedSize: number, dict?: Buffer): Buffer {
+	const withSize = Buffer.allocUnsafe(4 + compressed.length);
+	withSize.writeUInt32LE(uncompressedSize, 0);
+	compressed.copy(withSize, 4);
+	return dict ? uncompressSync(withSize, dict) : uncompressSync(withSize);
+}
 
 /** LZ4 Frame manuell dekodieren – unterstützt abhängige Blöcke (blockIndependence=0) für LSF */
 export function decompressLZ4Frame(raw: Buffer): Buffer {
@@ -26,21 +31,22 @@ export function decompressLZ4Frame(raw: Buffer): Buffer {
 	const blockChecksum = (flg >> 4) & 1;
 	const streamSize = (flg >> 3) & 1;
 	const dict = flg & 1;
-	if (streamSize) pos += 8;
+	let totalUncompressed: number | null = null;
+	if (streamSize) {
+		totalUncompressed = Number(raw.readBigUInt64LE(pos));
+		pos += 8;
+	}
 	if (dict) pos += 4;
 	pos += 1; // descriptor checksum
 	const chunks: Buffer[] = [];
-	const maxBlockBuffer = Math.max(blockMaxSize, 4 << 20);
 	let dictBuf: Buffer = Buffer.alloc(0);
 	const DICT_SIZE = 64 << 10;
-	const bindings = (lz4 as { utils?: { bindings?: { uncompressWithDict?: (input: Buffer, output: Buffer, dict?: Buffer) => number } } }).utils?.bindings;
-	const uncompressWithDict = bindings?.uncompressWithDict;
 
-	const decompressBlock = (blockData: Buffer, out: Buffer): number => {
-		if (!blockIndependence && dictBuf.length > 0 && uncompressWithDict) {
-			return uncompressWithDict(blockData, out, dictBuf);
+	const decompressBlock = (blockData: Buffer, uncompressedSize: number): Buffer => {
+		if (!blockIndependence && dictBuf.length > 0) {
+			return uncompressLz4Block(blockData, uncompressedSize, dictBuf);
 		}
-		return lz4.decodeBlock(blockData, out);
+		return uncompressLz4Block(blockData, uncompressedSize);
 	};
 
 	while (pos < raw.length - 4) {
@@ -57,12 +63,11 @@ export function decompressLZ4Frame(raw: Buffer): Buffer {
 			chunks.push(blockData);
 			dictBuf = Buffer.concat([dictBuf, blockData]).subarray(-DICT_SIZE);
 		} else {
-			const out = Buffer.alloc(maxBlockBuffer);
-			const decoded = decompressBlock(blockData, out);
-			if (decoded < 0) {
-				throw new Error(`LZ4 block decompression failed at offset ${pos - size - (blockChecksum ? 4 : 0)}, code ${decoded}`);
-			}
-			const chunk = out.subarray(0, decoded);
+			const decompressedSize =
+				totalUncompressed !== null
+					? Math.min(blockMaxSize, totalUncompressed - chunks.reduce((s, c) => s + c.length, 0))
+					: blockMaxSize;
+			const chunk = decompressBlock(blockData, decompressedSize);
 			chunks.push(chunk);
 			dictBuf = Buffer.concat([dictBuf, chunk]).subarray(-DICT_SIZE);
 		}
@@ -253,22 +258,20 @@ export class LSFReader {
 
 		if (method === 2) {
 			if (raw.readUInt32LE(0) === 0x184d2204) {
-				// LZ4-Frame: lz4.decode() nutzen (eigene decompressLZ4Frame schlägt bei abhängigen Blöcken fehl)
+				// LZ4-Frame
 				try {
-					const dec = lz4.decode(raw);
-					return Buffer.isBuffer(dec) ? dec : Buffer.from(dec);
+					return decompressFrameSync(raw);
 				} catch {
 					return decompressLZ4Frame(raw);
 				}
 			}
-			// Größerer Puffer wie bei LSV – manche Blöcke brauchen mehr Platz
-			const out = Buffer.alloc(Math.max(uncompressedSize, raw.length * 10));
-			let decoded = lz4.decodeBlock(raw, out);
-			if (decoded < 0) {
+			// Raw LZ4 block – lz4-napi braucht prepended size
+			try {
+				return uncompressLz4Block(raw, uncompressedSize);
+			} catch {
 				// Fallback: LZ4-Frame ohne Magic am Anfang oder Zstd
 				try {
-					const dec = lz4.decode(raw);
-					const buf = Buffer.isBuffer(dec) ? dec : Buffer.from(dec);
+					const buf = decompressFrameSync(raw);
 					if (buf.length <= uncompressedSize * 2) return buf.subarray(0, buf.length);
 				} catch {
 					// ignore
@@ -286,10 +289,8 @@ export class LSFReader {
 					raw.copy(result, 0, 0, Math.min(sizeOnDisk, uncompressedSize));
 					return result;
 				}
-				// Debug: welche Blockgrößen
-				throw new Error(`LZ4 block decompression failed at offset ${startOff}, code ${decoded} (uc=${uncompressedSize}, c=${sizeOnDisk})`);
+				throw new Error(`LZ4 block decompression failed at offset ${startOff} (uc=${uncompressedSize}, c=${sizeOnDisk})`);
 			}
-			return out.subarray(0, decoded);
 		}
 
 		if (method === 1) {

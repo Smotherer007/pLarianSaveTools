@@ -29,7 +29,7 @@ All commands are run in the terminal. Each command starts with `node dist/cli.js
 Create a target folder and unpack the LSV file into it.
 
 ```bash
-node dist/cli.js unpack Kiss.lsv ./extracted
+node dist/cli.js unpack QuickSave_14.lsv ./extracted
 ```
 
 ### Extract LSV directly to LSX
@@ -37,26 +37,26 @@ node dist/cli.js unpack Kiss.lsv ./extracted
 Use `extract-lsx` to unpack an LSV file and convert all LSF files to LSX in one step. The output folder will contain only LSX files (no LSF files).
 
 ```bash
-node dist/cli.js extract-lsx Kiss.lsv ./lsx-only
+node dist/cli.js extract-lsx QuickSave_14.lsv ./lsx-only
 ```
 
 ### Edit workflow
 
 1. **Extract** – Unpack LSV and convert LSF to LSX in one step
    ```bash
-   node dist/cli.js extract-lsx Kiss.lsv ./lsx-only
+   node dist/cli.js extract-lsx QuickSave_14.lsv ./lsx-only
    ```
 
 2. **Edit** – Open LSX files in a text editor (e.g. `meta.lsx` for Difficulty, player name)
 
 3. **Pack** – Convert LSX back to LSF and repack
    ```bash
-   node dist/cli.js pack-lsx ./lsx-only Kiss_repacked.lsv
+   node dist/cli.js pack-lsx ./lsx-only QuickSave_14_repacked.lsv
    ```
 
 4. **Optional: Cleanup** – Remove LSX files after packing
    ```bash
-   node dist/cli.js pack-lsx ./lsx-only Kiss_repacked.lsv --cleanup
+   node dist/cli.js pack-lsx ./lsx-only QuickSave_14_repacked.lsv --cleanup
    ```
 
 ### Repack a savegame

@@ -1,6 +1,6 @@
 {
-	"name": "dos2-savegame-tools",
-	"version": "1.0.0",
+	"name": "@patimweb/dos2-savegame-tools",
+	"version": "1.0.26",
 	"description": "LSV unpacking and LSF/LSB to LSX conversion for Divinity Original Sin 2 savegames",
 	"type": "module",
 	"main": "dist/index.js",
@@ -13,7 +13,6 @@
 	},
 	"scripts": {
 		"build": "tsc",
-		"postinstall": "patch-package && npm rebuild lz4",
 		"unpack": "node dist/cli.js unpack",
 		"convert": "node dist/cli.js convert",
 		"start": "node dist/cli.js",
@@ -45,14 +44,14 @@
 	"dependencies": {
 		"fast-xml-parser": "^5.3.5",
 		"fzstd": "^0.1.1",
-		"lz4": "^0.6.5",
+		"lz4-napi": "^2.9.0",
 		"zstd-napi": "^0.0.12"
 	},
 	"devDependencies": {
 		"@prettier/plugin-xml": "^3.4.2",
-		"patch-package": "^8.0.1",
 		"prettier": "^3.8.1",
 		"prettier-plugin-sh": "^0.18.0",
+		"semantic-release": "^25.0.3",
 		"typescript": "^5.9.3"
 	}
 }
