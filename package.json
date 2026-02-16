@@ -1,6 +1,6 @@
 {
 	"name": "@patimweb/dos2-savegame-tools",
-	"version": "1.0.26",
+	"version": "1.0.27",
 	"description": "LSV unpacking and LSF/LSB to LSX conversion for Divinity Original Sin 2 savegames",
 	"type": "module",
 	"main": "dist/index.js",
@@ -41,6 +41,9 @@
 	],
 	"author": "",
 	"license": "MIT",
+	"publishConfig": {
+		"access": "public"
+	},
 	"dependencies": {
 		"fast-xml-parser": "^5.3.5",
 		"fzstd": "^0.1.1",
