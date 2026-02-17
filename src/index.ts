@@ -21,7 +21,7 @@
  * ```
  */
 
-export { unpackLsv, readPackage } from "./lsv/unpacker.js";
+export { unpackLsv, readPackage, extractFileContent } from "./lsv/unpacker.js";
 export type { UnpackOptions } from "./lsv/unpacker.js";
 export { packLsv, packLsvFromLsx } from "./lsv/packer.js";
 export type { PackLsvOptions } from "./lsv/packer.js";
