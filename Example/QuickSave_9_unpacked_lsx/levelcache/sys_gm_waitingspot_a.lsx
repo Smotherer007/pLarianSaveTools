@@ -1,0 +1,489 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<save>
+	<version major="3" minor="6" revision="9" build="0" lslib_meta="v1,bswap_guids" />
+	<region id="ModuleSettings">
+		<node id="ModuleSettings">
+			<children>
+				<node id="ModuleSettings">
+					<children>
+						<node id="Mods">
+							<children>
+								<node id="ModuleShortDesc">
+									<attribute id="UUID" type="22" value="1301db3d-1f54-4e98-9be5-5094030916e4" />
+									<attribute id="Name" type="22" value="Divinity: Original Sin 2" />
+									<attribute id="Version" type="4" value="373234071" />
+									<attribute id="MD5" type="23" value="73d13f95607b70c953cc32e56d62b7d7" />
+									<attribute id="Folder" type="30" value="DivinityOrigins_1301db3d-1f54-4e98-9be5-5094030916e4" />
+								</node>
+								<node id="ModuleShortDesc">
+									<attribute id="UUID" type="22" value="2bd9bdbe-22ae-4aa2-9c93-205880fc6564" />
+									<attribute id="Name" type="22" value="Shared" />
+									<attribute id="Version" type="4" value="389028377" />
+									<attribute id="MD5" type="23" value="bbe5db70bb4fb88387fb2319428a6995" />
+									<attribute id="Folder" type="30" value="Shared" />
+								</node>
+								<node id="ModuleShortDesc">
+									<attribute id="UUID" type="22" value="eedf7638-36ff-4f26-a50a-076b87d53ba0" />
+									<attribute id="Name" type="22" value="Shared_DOS" />
+									<attribute id="Version" type="4" value="268435456" />
+									<attribute id="MD5" type="23" value="51f45a5233f4b8a45b8a8ab71eccbc30" />
+									<attribute id="Folder" type="30" value="Shared_DOS" />
+								</node>
+								<node id="ModuleShortDesc">
+									<attribute id="UUID" type="22" value="01888044-40fa-4250-8934-add840ac23b7" />
+									<attribute id="Name" type="22" value="Party Size Evolved" />
+									<attribute id="Version" type="4" value="318898176" />
+									<attribute id="MD5" type="23" value="f3e95d51c1ffb403cb40e154355442c8" />
+									<attribute id="Folder" type="30" value="PartySizeEvolved_01888044-40fa-4250-8934-add840ac23b7" />
+								</node>
+								<node id="ModuleShortDesc">
+									<attribute id="UUID" type="22" value="3da57b9d-8b41-46c7-a33c-afb31eea38a3" />
+									<attribute id="Name" type="22" value="ArmorSets" />
+									<attribute id="Version" type="4" value="268435456" />
+									<attribute id="MD5" type="23" value="aa6c24718451153579f7b011e70763b8" />
+									<attribute id="Folder" type="30" value="ArmorSets" />
+								</node>
+							</children>
+						</node>
+					</children>
+				</node>
+			</children>
+		</node>
+	</region>
+	<region id="Inventories">
+		<node id="Inventories">
+			<children>
+				<node id="InventoryFactory">
+					<children>
+						<node id="Creators" />
+						<node id="Inventories" />
+					</children>
+				</node>
+			</children>
+		</node>
+	</region>
+	<region id="InventoryViews">
+		<node id="InventoryViews">
+			<children>
+				<node id="InventoryViewFactory">
+					<children>
+						<node id="Creators" />
+						<node id="InventoryViews" />
+					</children>
+				</node>
+			</children>
+		</node>
+	</region>
+	<region id="EntityWorld">
+		<node id="EntityWorld">
+			<children>
+				<node id="Entity">
+					<children>
+						<node id="Component">
+							<attribute id="Handle" type="24" value="216172786408751116" />
+						</node>
+					</children>
+				</node>
+				<node id="Entity">
+					<children>
+						<node id="Component">
+							<attribute id="Handle" type="24" value="216172786408751115" />
+						</node>
+					</children>
+				</node>
+				<node id="Entity">
+					<children>
+						<node id="Component">
+							<attribute id="Handle" type="24" value="216172786408751114" />
+						</node>
+					</children>
+				</node>
+				<node id="Entity">
+					<children>
+						<node id="Component">
+							<attribute id="Handle" type="24" value="216172786408751113" />
+						</node>
+					</children>
+				</node>
+				<node id="Entity">
+					<children>
+						<node id="Component">
+							<attribute id="Handle" type="24" value="36028801313931825" />
+						</node>
+					</children>
+				</node>
+				<node id="Entity">
+					<children>
+						<node id="Component">
+							<attribute id="Handle" type="24" value="36028801313931826" />
+						</node>
+					</children>
+				</node>
+				<node id="Entity">
+					<children>
+						<node id="Component">
+							<attribute id="Handle" type="24" value="288230380446679058" />
+						</node>
+					</children>
+				</node>
+			</children>
+		</node>
+	</region>
+	<region id="CombatComponents">
+		<node id="CombatComponents">
+			<children>
+				<node id="Creators" />
+			</children>
+		</node>
+	</region>
+	<region id="Characters">
+		<node id="Characters">
+			<children>
+				<node id="CharacterFactory">
+					<children>
+						<node id="Creators" />
+						<node id="Characters" />
+					</children>
+				</node>
+			</children>
+		</node>
+	</region>
+	<region id="Items">
+		<node id="Items">
+			<children>
+				<node id="ItemFactory">
+					<children>
+						<node id="Creators">
+							<children>
+								<node id="Creator">
+									<attribute id="Handle" type="24" value="36028801313931826" />
+									<attribute id="TemplateType" type="1" value="2" />
+									<attribute id="TemplateID" type="31" value="ecae7b42-054d-4354-b67e-5691dc3555c8" />
+									<attribute id="UUID" type="31" value="ecae7b42-054d-4354-b67e-5691dc3555c8" />
+								</node>
+								<node id="Creator">
+									<attribute id="Handle" type="24" value="36028801313931825" />
+									<attribute id="TemplateType" type="1" value="2" />
+									<attribute id="TemplateID" type="31" value="a34d5d3d-ae5a-4469-a485-8403c53bee64" />
+									<attribute id="UUID" type="31" value="a34d5d3d-ae5a-4469-a485-8403c53bee64" />
+								</node>
+							</children>
+						</node>
+						<node id="Items">
+							<children>
+								<node id="Item">
+									<attribute id="Translate" type="12" value="35.979156 10.323143 35.615234" />
+									<attribute id="Flags" type="24" value="321" />
+									<attribute id="Level" type="22" value="SYS_GM_Waitingspot_A" />
+									<attribute id="Rotate" type="13" value="0 0 0 1" />
+									<attribute id="Scale" type="6" value="1" />
+									<attribute id="TreasureLevel" type="4" value="-1" />
+									<attribute id="LevelOverride" type="4" value="20" />
+									<attribute id="CurrentTemplate" type="31" value="ecae7b42-054d-4354-b67e-5691dc3555c8" />
+									<attribute id="CurrentTemplateType" type="1" value="2" />
+									<attribute id="Stats" type="22" value="Gen_LightSource" />
+									<attribute id="Slot" type="3" value="65535" />
+									<attribute id="Vitality" type="4" value="-1" />
+									<attribute id="Armor" type="4" value="0" />
+									<attribute id="LifeTime" type="6" value="0" />
+									<attribute id="UseRemotely" type="19" value="False" />
+									<children>
+										<node id="ItemMachine" />
+										<node id="VariableManager">
+											<children>
+												<node id="IntList">
+													<attribute id="Variables" type="25" value="AQAAAAAAAAA=" />
+													<attribute id="Remaps" type="25" value="AAABAA==" />
+												</node>
+												<node id="Int64List">
+													<attribute id="Variables" type="25" value="AQAAAAEAAAA=" />
+													<attribute id="Remaps" type="25" value="AAA=" />
+												</node>
+												<node id="StringList">
+													<attribute id="Variables" type="25" value="AgAAACkAUlMzX0ZYX0xUU19IdW1hbnNfRHVuZ2Vvbl9Db2FsYmFza2V0X0NfMDEoAEl0ZW1zX09iamVjdHNfUlMzX0ZYX0xUU19GaXJlX0lnbml0ZV9NZWQ=" />
+													<attribute id="Remaps" type="25" value="AAABAA==" />
+												</node>
+												<node id="FixedStringList">
+													<attribute id="Variables" type="25" value="AgAAAAgARHVtbXlfRlgkAGVjYWU3YjQyLTA1NGQtNDM1NC1iNjdlLTU2OTFkYzM1NTVjOA==" />
+													<attribute id="Remaps" type="25" value="AAABAA==" />
+												</node>
+												<node id="Key2TableList">
+													<attribute id="HandleList" type="25" value="BwAAAL0BAAAUAAAAMgIAAAEAAA6mBgAACwAAADICAAABAAAOpwYAAAwAAAAyAgAAAQAADqgGAAAJAAAAMgIAAAEAAA6pBgAACAAAADICAAABAAAOqgYAABMAAAAyAgAAAQAADqsGAAAQAAAAMgIAAAEAAA4=" />
+												</node>
+											</children>
+										</node>
+										<node id="PlanManager">
+											<attribute id="CurrentReaction" type="22" value="" />
+											<attribute id="ScriptFrameID" type="22" value="" />
+											<children>
+												<node id="Script" />
+												<node id="Timers" />
+												<node id="ReactionDelays" />
+											</children>
+										</node>
+										<node id="StatusManager">
+											<children>
+												<node id="StatusMeta">
+													<attribute id="ID" type="22" value="BURNING" />
+													<attribute id="Handle" type="24" value="4294967296" />
+												</node>
+												<node id="STATUS">
+													<attribute id="ID" type="22" value="BURNING" />
+													<attribute id="CanEnterChance" type="4" value="100" />
+													<attribute id="LifeTime" type="6" value="-1" />
+													<attribute id="CurrentLifeTime" type="6" value="-1" />
+													<attribute id="TurnTimer" type="6" value="3.1957297" />
+													<attribute id="DamageSourceType" type="27" value="0" />
+													<attribute id="StatsMultiplier" type="6" value="1" />
+													<attribute id="Started" type="19" value="True" />
+													<attribute id="IsHostileAct" type="19" value="True" />
+													<attribute id="IsLifeTimeSet" type="19" value="True" />
+													<attribute id="EffectTime" type="6" value="0" />
+													<attribute id="StatsId" type="22" value="Stats_Burning" />
+													<attribute id="SourceDirection" type="12" value="0 1 0" />
+													<attribute id="Turn" type="4" value="214" />
+													<attribute id="OriginalWeaponStatsId" type="22" value="" />
+													<attribute id="OverrideWeaponStatsId" type="22" value="" />
+													<attribute id="OverrideWeaponHandle" type="24" value="0" />
+													<attribute id="ResetAllCooldowns" type="19" value="False" />
+													<attribute id="ResetOncePerCombat" type="19" value="False" />
+													<attribute id="ScaleWithVitality" type="19" value="False" />
+													<attribute id="LoseControl" type="19" value="False" />
+													<attribute id="HealEffectOverride" type="1" value="4" />
+													<attribute id="HitTimer" type="6" value="6" />
+													<attribute id="TimeElapsed" type="6" value="0" />
+													<attribute id="DamageLevel" type="4" value="1" />
+													<attribute id="DamageStats" type="22" value="Damage_Burning" />
+													<attribute id="DamageEvent" type="3" value="1" />
+													<attribute id="SpawnBlood" type="19" value="False" />
+													<children>
+														<node id="StatsIDs">
+															<attribute id="Turn" type="4" value="0" />
+															<attribute id="StatsID" type="22" value="Stats_Burning" />
+														</node>
+														<node id="SurfaceChange">
+															<attribute id="Object" type="5" value="1" />
+														</node>
+													</children>
+												</node>
+											</children>
+										</node>
+									</children>
+								</node>
+								<node id="Item">
+									<attribute id="Translate" type="12" value="43.423157 13.884428 51.54319" />
+									<attribute id="Flags" type="24" value="16777665" />
+									<attribute id="Level" type="22" value="SYS_GM_Waitingspot_A" />
+									<attribute id="Rotate" type="13" value="0 0 0 1" />
+									<attribute id="Scale" type="6" value="1" />
+									<attribute id="TreasureLevel" type="4" value="-1" />
+									<attribute id="LevelOverride" type="4" value="20" />
+									<attribute id="CurrentTemplate" type="31" value="a34d5d3d-ae5a-4469-a485-8403c53bee64" />
+									<attribute id="CurrentTemplateType" type="1" value="2" />
+									<attribute id="Stats" type="22" value="Gen_LightSource" />
+									<attribute id="Slot" type="3" value="65535" />
+									<attribute id="Vitality" type="4" value="-1" />
+									<attribute id="Armor" type="4" value="0" />
+									<attribute id="LifeTime" type="6" value="0" />
+									<attribute id="UseRemotely" type="19" value="False" />
+									<children>
+										<node id="ItemMachine" />
+										<node id="VariableManager">
+											<children>
+												<node id="IntList">
+													<attribute id="Variables" type="25" value="AQAAAAAAAAA=" />
+													<attribute id="Remaps" type="25" value="AAABAA==" />
+												</node>
+												<node id="Int64List">
+													<attribute id="Variables" type="25" value="AAAAAAEAAAA=" />
+													<attribute id="Remaps" type="25" value="AAA=" />
+												</node>
+												<node id="StringList">
+													<attribute id="Variables" type="25" value="AgAAAC0AUlMzX0ZYX0xUU19IdW1hbnNfRHVuZ2Vvbl9Ub3JjaF9TdGFuZGluZ19FXzAxKgBJdGVtc19PYmplY3RzX1JTM19GWF9MVFNfRmlyZV9JZ25pdGVfU21hbGw=" />
+													<attribute id="Remaps" type="25" value="AAABAA==" />
+												</node>
+												<node id="FixedStringList">
+													<attribute id="Variables" type="25" value="AgAAAAsARHVtbXlfRlhfMDEkAGEzNGQ1ZDNkLWFlNWEtNDQ2OS1hNDg1LTg0MDNjNTNiZWU2NA==" />
+													<attribute id="Remaps" type="25" value="AAABAA==" />
+												</node>
+												<node id="Key2TableList">
+													<attribute id="HandleList" type="25" value="BwAAAL0BAAAUAAAAMQIAAAEAAA6mBgAACwAAADECAAABAAAOpwYAAAwAAAAxAgAAAQAADqgGAAAJAAAAMQIAAAEAAA6pBgAACAAAADECAAABAAAOqgYAABMAAAAxAgAAAQAADqsGAAAQAAAAMQIAAAEAAA4=" />
+												</node>
+											</children>
+										</node>
+										<node id="PlanManager">
+											<attribute id="CurrentReaction" type="22" value="" />
+											<attribute id="ScriptFrameID" type="22" value="" />
+											<children>
+												<node id="Script" />
+												<node id="Timers" />
+												<node id="ReactionDelays" />
+											</children>
+										</node>
+										<node id="StatusManager">
+											<children>
+												<node id="StatusMeta">
+													<attribute id="ID" type="22" value="BURNING" />
+													<attribute id="Handle" type="24" value="4294967296" />
+												</node>
+												<node id="STATUS">
+													<attribute id="ID" type="22" value="BURNING" />
+													<attribute id="CanEnterChance" type="4" value="100" />
+													<attribute id="LifeTime" type="6" value="-1" />
+													<attribute id="CurrentLifeTime" type="6" value="-1" />
+													<attribute id="TurnTimer" type="6" value="3.1957297" />
+													<attribute id="DamageSourceType" type="27" value="0" />
+													<attribute id="StatsMultiplier" type="6" value="1" />
+													<attribute id="Started" type="19" value="True" />
+													<attribute id="IsHostileAct" type="19" value="True" />
+													<attribute id="IsLifeTimeSet" type="19" value="True" />
+													<attribute id="EffectTime" type="6" value="0" />
+													<attribute id="StatsId" type="22" value="Stats_Burning" />
+													<attribute id="SourceDirection" type="12" value="0 1 0" />
+													<attribute id="Turn" type="4" value="214" />
+													<attribute id="OriginalWeaponStatsId" type="22" value="" />
+													<attribute id="OverrideWeaponStatsId" type="22" value="" />
+													<attribute id="OverrideWeaponHandle" type="24" value="0" />
+													<attribute id="ResetAllCooldowns" type="19" value="False" />
+													<attribute id="ResetOncePerCombat" type="19" value="False" />
+													<attribute id="ScaleWithVitality" type="19" value="False" />
+													<attribute id="LoseControl" type="19" value="False" />
+													<attribute id="HealEffectOverride" type="1" value="4" />
+													<attribute id="HitTimer" type="6" value="6" />
+													<attribute id="TimeElapsed" type="6" value="0" />
+													<attribute id="DamageLevel" type="4" value="1" />
+													<attribute id="DamageStats" type="22" value="Damage_Burning" />
+													<attribute id="DamageEvent" type="3" value="1" />
+													<attribute id="SpawnBlood" type="19" value="False" />
+													<children>
+														<node id="StatsIDs">
+															<attribute id="Turn" type="4" value="0" />
+															<attribute id="StatsID" type="22" value="Stats_Burning" />
+														</node>
+														<node id="SurfaceChange">
+															<attribute id="Object" type="5" value="1" />
+														</node>
+													</children>
+												</node>
+											</children>
+										</node>
+									</children>
+								</node>
+							</children>
+						</node>
+					</children>
+				</node>
+			</children>
+		</node>
+	</region>
+	<region id="ItemMover">
+		<node id="ItemMover" />
+	</region>
+	<region id="Triggers">
+		<node id="Triggers">
+			<children>
+				<node id="TriggerFactory">
+					<children>
+						<node id="Creators">
+							<children>
+								<node id="Creator">
+									<attribute id="Handle" type="24" value="216172786408751113" />
+									<attribute id="TemplateType" type="1" value="2" />
+									<attribute id="TemplateID" type="22" value="08edee69-c596-8866-21d4-212e384b5333" />
+									<attribute id="SendItemEvents" type="19" value="False" />
+								</node>
+								<node id="Creator">
+									<attribute id="Handle" type="24" value="216172786408751114" />
+									<attribute id="TemplateType" type="1" value="2" />
+									<attribute id="TemplateID" type="22" value="bbd3e661-0185-877c-3538-8e63ddb4c9e2" />
+									<attribute id="SendItemEvents" type="19" value="False" />
+								</node>
+								<node id="Creator">
+									<attribute id="Handle" type="24" value="216172786408751115" />
+									<attribute id="TemplateType" type="1" value="2" />
+									<attribute id="TemplateID" type="22" value="c3fbdd60-fed7-8faf-2056-35000dfaa5aa" />
+									<attribute id="SendItemEvents" type="19" value="False" />
+								</node>
+								<node id="Creator">
+									<attribute id="Handle" type="24" value="216172786408751116" />
+									<attribute id="TemplateType" type="1" value="2" />
+									<attribute id="TemplateID" type="22" value="f08f4aa2-b070-8204-3402-96a33fe48d96" />
+									<attribute id="SendItemEvents" type="19" value="False" />
+								</node>
+								<node id="Creator">
+									<attribute id="Handle" type="24" value="288230380446679058" />
+									<attribute id="TemplateType" type="1" value="2" />
+									<attribute id="TemplateID" type="22" value="070381c3-fdd6-4b72-9d76-7be46e8198b6" />
+									<attribute id="SendItemEvents" type="19" value="False" />
+								</node>
+							</children>
+						</node>
+						<node id="Triggers">
+							<children>
+								<node id="Trigger">
+									<attribute id="Translate" type="12" value="38.250885 10.719074 36.323563" />
+									<attribute id="Level" type="22" value="SYS_GM_Waitingspot_A" />
+									<attribute id="Rotate" type="13" value="0 0 0 1" />
+								</node>
+								<node id="Trigger">
+									<attribute id="Translate" type="12" value="39.454132 10.719074 43.207214" />
+									<attribute id="Level" type="22" value="SYS_GM_Waitingspot_A" />
+									<attribute id="Rotate" type="13" value="0 0 0 1" />
+								</node>
+								<node id="Trigger">
+									<attribute id="Translate" type="12" value="41.689026 10.719074 39.27086" />
+									<attribute id="Level" type="22" value="SYS_GM_Waitingspot_A" />
+									<attribute id="Rotate" type="13" value="0 0 0 1" />
+								</node>
+								<node id="Trigger">
+									<attribute id="Translate" type="12" value="34.368744 11.338167 40.104973" />
+									<attribute id="Level" type="22" value="SYS_GM_Waitingspot_A" />
+									<attribute id="Rotate" type="13" value="0 0 0 1" />
+								</node>
+								<node id="Trigger">
+									<attribute id="Translate" type="12" value="37.14215 3.8055382 41.394638" />
+									<attribute id="Level" type="22" value="SYS_GM_Waitingspot_A" />
+									<attribute id="Rotate" type="13" value="0 0 0 1" />
+								</node>
+							</children>
+						</node>
+					</children>
+				</node>
+			</children>
+		</node>
+	</region>
+	<region id="Projectiles">
+		<node id="Projectiles">
+			<children>
+				<node id="ProjectileManager">
+					<children>
+						<node id="Creators" />
+						<node id="Projectiles" />
+					</children>
+				</node>
+			</children>
+		</node>
+	</region>
+	<region id="CustomStats">
+		<node id="CustomStats" />
+	</region>
+	<region id="Splines">
+		<node id="Splines" />
+	</region>
+	<region id="CacheTemplates">
+		<node id="CacheTemplates">
+			<children>
+				<node id="CacheTemplates" />
+			</children>
+		</node>
+	</region>
+	<region id="MetaData">
+		<node id="MetaData">
+			<children>
+				<node id="MetaData">
+					<attribute id="HandleList" type="25" value="BwAAADICAAABAAAOMQIAAAEAAA4JAAAAAQDAEAoAAAABAMAQCwAAAAEAwBAMAAAAAQDAEBIAAAABAAAS" />
+				</node>
+			</children>
+		</node>
+	</region>
+</save>

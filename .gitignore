@@ -12,6 +12,7 @@ tmp-verify/
 
 # Savegame files (can be large)
 *.lsv
+!Example/**/*.lsv
 
 # OS
 .DS_Store

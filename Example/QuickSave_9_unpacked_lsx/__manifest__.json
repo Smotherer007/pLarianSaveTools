@@ -1,0 +1,39 @@
+{
+  "version": 13,
+  "files": [
+    {
+      "name": "globals.lsx",
+      "flags": 33
+    },
+    {
+      "name": "levelcache/arena_menu.lsx",
+      "flags": 33
+    },
+    {
+      "name": "levelcache/fj_fortjoy_main.lsx",
+      "flags": 33
+    },
+    {
+      "name": "levelcache/sys_character_creation_a.lsx",
+      "flags": 33
+    },
+    {
+      "name": "levelcache/sys_gm_waitingspot_a.lsx",
+      "flags": 33
+    },
+    {
+      "name": "levelcache/tut_tutorial_a.lsx",
+      "flags": 33
+    },
+    {
+      "name": "meta.lsx",
+      "flags": 33
+    },
+    {
+      "name": "quicksave_9.png",
+      "flags": 33
+    }
+  ],
+  "flags": 1,
+  "priority": 0
+}
