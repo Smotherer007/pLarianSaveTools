@@ -30,3 +30,6 @@ npm-debug.log*
 # Env
 .env
 .env.local
+
+# Editor sessions (user uploads)
+editor/sessions/

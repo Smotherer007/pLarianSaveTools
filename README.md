@@ -85,6 +85,20 @@ LSF files are binary and hard to read. After converting to LSX you can edit them
 
 Use `help` or `--help` to see an overview of all commands.
 
+## Web Editor
+
+Ein vollständiger Savegame-Editor mit Web-Oberfläche befindet sich im Ordner `editor/`:
+
+```bash
+cd editor && npm install && npm run dev
+```
+
+- **Upload** – LSV hochladen (nur meta + globals werden extrahiert)
+- **Bearbeiten** – Schwierigkeit, Charakternamen, Meta-Daten
+- **Download** – Bearbeitete LSV herunterladen
+
+**Deployment:** Siehe [DEPLOYMENT.md](DEPLOYMENT.md) für Render, Railway und GitHub Actions.
+
 ## Supported games
 
 - **Divinity Original Sin 2** (DOS2)

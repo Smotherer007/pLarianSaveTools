@@ -1,0 +1,19 @@
+# Render.com Blueprint – DOS2 Savegame Editor
+# https://render.com/docs/blueprint-spec
+#
+# Einrichtung:
+# 1. render.com → New → Blueprint
+# 2. Repo verbinden (GitHub)
+# 3. render.yaml wird erkannt
+
+services:
+  - type: web
+    name: dos2-savegame-editor
+    runtime: node
+
+    buildCommand: npm ci && npm run build && npm run editor:build
+    startCommand: npm run editor:start
+
+    envVars:
+      - key: NODE_ENV
+        value: production
