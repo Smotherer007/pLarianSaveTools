@@ -24,11 +24,7 @@
 		"convert-stepwise": "node dist/scripts/convert-lsf-stepwise.js",
 		"extract": "node dist/cli.js extract-lsx",
 		"pack": "node dist/cli.js pack-lsx",
-		"verify:lsx-roundtrip": "node dist/scripts/verify-lsx-roundtrip.js",
-		"editor": "npm run dev --prefix editor",
-		"editor:dev": "npm run dev --prefix editor",
-		"editor:build": "npm run build --prefix editor",
-		"editor:start": "npm run start --prefix editor"
+		"verify:lsx-roundtrip": "node dist/scripts/verify-lsx-roundtrip.js"
 	},
 	"keywords": [
 		"dos2",

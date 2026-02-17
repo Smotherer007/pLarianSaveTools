@@ -87,17 +87,7 @@ Use `help` or `--help` to see an overview of all commands.
 
 ## Web Editor
 
-Ein vollständiger Savegame-Editor mit Web-Oberfläche befindet sich im Ordner `editor/`:
-
-```bash
-cd editor && npm install && npm run dev
-```
-
-- **Upload** – LSV hochladen (nur meta + globals werden extrahiert)
-- **Bearbeiten** – Schwierigkeit, Charakternamen, Meta-Daten
-- **Download** – Bearbeitete LSV herunterladen
-
-**Deployment:** Siehe [DEPLOYMENT.md](DEPLOYMENT.md) für Render, Railway und GitHub Actions.
+Dieses Projekt enthält nur die CLI-Tools. Für eine Web-Oberfläche zum Bearbeiten von Savegames siehe das separate Projekt [dos2-savegameeditor](https://github.com/Smotherer007/dos2-savegameeditor).
 
 ## Supported games
 
