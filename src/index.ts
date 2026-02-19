@@ -33,3 +33,22 @@ export type { LsfVersion, WriteLsfOptions, LSFStringTable } from "./lsf/writer.j
 export { convertLsfToLsx } from "./lsx/lsx-writer.js";
 export { parseLsx } from "./lsx/lsx-reader.js";
 export type { LsxVersion, LsxOptions } from "./lsx/lsx-writer.js";
+export {
+	editSaveTime,
+	getMods,
+	reorderParty,
+	editClientData,
+	getClientDatas,
+	type SaveTimeValues,
+	type ModInfo,
+	type ClientDataValues
+} from "./edit/meta-editor.js";
+export {
+	getPartyExperience,
+	setPartyExperience,
+	getCurrentGameTime,
+	getUnlockedRecipes,
+	getRegisteredWaypoints,
+	getTimeOfDay,
+	setTimeOfDay
+} from "./edit/globals-editor.js";

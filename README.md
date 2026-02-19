@@ -47,7 +47,15 @@ node dist/cli.js extract-lsx QuickSave_14.lsv ./lsx-only
    node dist/cli.js extract-lsx QuickSave_14.lsv ./lsx-only
    ```
 
-2. **Edit** – Open LSX files in a text editor (e.g. `meta.lsx` for Difficulty, player name)
+2. **Edit** – Use CLI edit commands or open LSX files in a text editor
+   ```bash
+   node dist/cli.js edit savetime ./lsx-only --year 127 --month 3 --day 17
+   node dist/cli.js edit mods ./lsx-only
+   node dist/cli.js edit party-order ./lsx-only 3,1,2,4,5
+   node dist/cli.js edit client-data ./lsx-only --slot 1 --rotation 90 --distance 20
+   node dist/cli.js edit party-xp ./lsx-only 50000
+   node dist/cli.js edit info ./lsx-only
+   ```
 
 3. **Pack** – Convert LSX back to LSF and repack
    ```bash
@@ -80,6 +88,14 @@ LSF files are binary and hard to read. After converting to LSX you can edit them
 | Repack (LSF)               | `node dist/cli.js pack source-folder output.lsv`     |
 | LSF → LSX                  | `node dist/cli.js convert file.lsf file.lsx`         |
 | LSX → LSF                  | `node dist/cli.js convert file.lsx file.lsf`         |
+| **Edit savetime**          | `node dist/cli.js edit savetime folder [--year N --month N ...]` |
+| **Edit mods**              | `node dist/cli.js edit mods folder`                  |
+| **Edit party-order**       | `node dist/cli.js edit party-order folder 3,1,2,4,5` |
+| **Edit client-data**       | `node dist/cli.js edit client-data folder [--slot N --rotation X ...]` |
+| **Edit party-xp**          | `node dist/cli.js edit party-xp folder [value]`      |
+| **Edit waypoints/recipes** | `node dist/cli.js edit waypoints folder`            |
+| **Edit time-of-day**       | `node dist/cli.js edit time-of-day folder [value]`  |
+| **Edit info**              | `node dist/cli.js edit info folder`                  |
 
 ### Help
 
